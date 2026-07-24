@@ -39,6 +39,7 @@ if str(_PROJECT_ROOT) not in sys.path:
 
 from core.godot_controller import GodotController  # noqa: E402
 from core.scene_builder import SceneBuilder  # noqa: E402
+from core.script_builder import ScriptBuilder  # noqa: E402
 from core.vision_qa import VisionQA  # noqa: E402
 
 # ---------------------------------------------------------------------------
@@ -67,6 +68,7 @@ logger.info("Godot project   : %s", GODOT_PROJECT)
 godot = GodotController(godot_path=GODOT_PATH, project_dir=GODOT_PROJECT)
 vision = VisionQA()
 scene = SceneBuilder(project_dir=GODOT_PROJECT)
+script = ScriptBuilder(project_dir=GODOT_PROJECT)
 
 # ---------------------------------------------------------------------------
 # MCP Server instance
@@ -191,6 +193,62 @@ class ModifySceneInput(BaseModel):
             "remove_node: {action, name}, "
             "set_property: {action, node, property, value}, "
             "connect_signal: {action, signal, from_node, to_node, to_method}"
+        ),
+    )
+
+
+class ReadScriptInput(BaseModel):
+    """Input for reading a .gd script file."""
+
+    script_path: str = Field(
+        ...,
+        description=(
+            "Relative path to the .gd file inside the Godot project. "
+            "Example: 'scripts/player.gd'"
+        ),
+    )
+
+
+class CreateScriptInput(BaseModel):
+    """Input for creating a .gd script from a JSON definition."""
+
+    script_path: str = Field(
+        ...,
+        description=(
+            "Relative path where the .gd will be written. "
+            "Example: 'scripts/player.gd'"
+        ),
+    )
+    definition: dict = Field(
+        ...,
+        description=(
+            "Script definition with keys: extends (required), class_name, "
+            "signals (list), variables (list of dicts with name, type, value, export), "
+            "functions (list of dicts with name, args, body, return_type)."
+        ),
+    )
+
+
+class ModifyScriptInput(BaseModel):
+    """Input for modifying an existing .gd script."""
+
+    script_path: str = Field(
+        ...,
+        description="Relative path to the .gd file to modify.",
+    )
+    operations: list[dict] = Field(
+        ...,
+        description=(
+            "List of operations to apply. Each op has 'action' and relevant fields: "
+            "add_signal: {action, name}, "
+            "remove_signal: {action, name}, "
+            "add_variable: {action, name, type?, value?, export?}, "
+            "remove_variable: {action, name}, "
+            "add_function: {action, name, args?, body?, return_type?}, "
+            "remove_function: {action, name}, "
+            "replace_function_body: {action, name, body}, "
+            "set_extends: {action, value}, "
+            "set_class_name: {action, value}"
         ),
     )
 
@@ -418,6 +476,89 @@ async def modify_scene(scene_path: str, operations: list[dict]) -> str:
 
     except Exception as exc:
         msg = f"ERROR modifying scene: {exc}"
+        logger.error(msg)
+        return msg
+
+
+@mcp.tool()
+async def read_script(script_path: str) -> str:
+    """Read and parse a Godot .gd script file into structured JSON.
+
+    Parses the script file and returns all components: extends, class_name,
+    signals, variables, functions, and metadata. Use this to inspect the
+    current state of a script before making modifications.
+
+    The script_path is relative to the Godot project root.
+    Example: 'scripts/player.gd'
+    """
+    logger.info("read_script → %s", script_path)
+
+    try:
+        parsed = script.read(script_path)
+        return str(parsed)
+
+    except Exception as exc:
+        msg = f"ERROR reading script: {exc}"
+        logger.error(msg)
+        return msg
+
+
+@mcp.tool()
+async def create_script(script_path: str, definition: dict) -> str:
+    """Create a new .gd script file from a JSON definition.
+
+    Generates a valid GDScript file with the specified extends, class_name,
+    signals, variables, and functions.
+
+    The definition should include:
+    - extends: (required) base class name (e.g., 'Node', 'CharacterBody2D')
+    - class_name: (optional) class name for the script
+    - signals: (optional) list of signal names or dicts with name/parameters
+    - variables: (optional) list of dicts with name, type, value, export
+    - functions: (optional) list of dicts with name, args, body, return_type
+
+    The script_path is relative to the Godot project root.
+    Example: 'scripts/player.gd'
+    """
+    logger.info(
+        "create_script → %s (functions=%d)", script_path, len(definition.get("functions", []))
+    )
+
+    try:
+        result = script.create(script_path, definition)
+        return result
+
+    except Exception as exc:
+        msg = f"ERROR creating script: {exc}"
+        logger.error(msg)
+        return msg
+
+
+@mcp.tool()
+async def modify_script(script_path: str, operations: list[dict]) -> str:
+    """Modify an existing .gd script file with surgical operations.
+
+    Apply multiple operations in sequence to an existing script:
+    - add_signal: {action: 'add_signal', name}
+    - remove_signal: {action: 'remove_signal', name}
+    - add_variable: {action: 'add_variable', name, type?, value?, export?}
+    - remove_variable: {action: 'remove_variable', name}
+    - add_function: {action: 'add_function', name, args?, body?, return_type?}
+    - remove_function: {action: 'remove_function', name}
+    - replace_function_body: {action: 'replace_function_body', name, body}
+    - set_extends: {action: 'set_extends', value}
+    - set_class_name: {action: 'set_class_name', value}
+
+    The script_path is relative to the Godot project root.
+    """
+    logger.info("modify_script → %s (ops=%d)", script_path, len(operations))
+
+    try:
+        result = script.modify(script_path, operations)
+        return result
+
+    except Exception as exc:
+        msg = f"ERROR modifying script: {exc}"
         logger.error(msg)
         return msg
 
