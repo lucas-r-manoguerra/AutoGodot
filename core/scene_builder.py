@@ -311,6 +311,7 @@ class SceneBuilder:
 
         Nodes must have the root first (parent=null), then children.
         Parent paths are normalized: "./Child" becomes "Child".
+        The root node is identified by parent=None.
         """
         root_node = None
         child_nodes: list[dict[str, Any]] = []
@@ -340,7 +341,12 @@ class SceneBuilder:
         # Create children (assume well-ordered: parents before children)
         for child_def in child_nodes:
             parent_path = child_def["_normalized_parent"]
+
+            # Resolve parent: first try tree.get_node, then check if it's the root
             parent = tree.get_node(parent_path)
+            if parent is None and parent_path == root.name:
+                parent = root
+
             if parent is None:
                 raise ValueError(
                     f"Cannot find parent node {parent_path} of {child_def['name']}"
@@ -367,10 +373,21 @@ class SceneBuilder:
     # Modify helpers
     # ------------------------------------------------------------------
 
+    def _resolve_node(self, tree: Any, path: str) -> Any:
+        """Resolve a node by path, falling back to root name match.
+
+        tree.get_node(".") returns root, but tree.get_node("RootName") returns None.
+        This helper handles both cases.
+        """
+        node = tree.get_node(path)
+        if node is None and tree.root is not None and path == tree.root.name:
+            node = tree.root
+        return node
+
     def _op_add_node(self, tree: Any, op: dict[str, Any], changes: list[str]) -> None:
         """Add a node to the tree."""
         parent_path = op.get("parent", ".")
-        parent = tree.get_node(parent_path)
+        parent = self._resolve_node(tree, parent_path)
         if parent is None:
             raise ValueError(f"Parent node not found: {parent_path}")
 
@@ -389,8 +406,8 @@ class SceneBuilder:
         self, tree: Any, op: dict[str, Any], changes: list[str]
     ) -> None:
         """Remove a node and its descendants."""
-        target_path = op.get("target", "")
-        target = tree.get_node(target_path)
+        target_path = op.get("target", op.get("name", ""))
+        target = self._resolve_node(tree, target_path)
         if target is None:
             raise ValueError(f"Node not found: {target_path}")
 
@@ -406,8 +423,8 @@ class SceneBuilder:
         self, tree: Any, op: dict[str, Any], changes: list[str]
     ) -> None:
         """Set a property on a node."""
-        target_path = op.get("target", "")
-        target = tree.get_node(target_path)
+        target_path = op.get("target", op.get("node", ""))
+        target = self._resolve_node(tree, target_path)
         if target is None:
             raise ValueError(f"Node not found: {target_path}")
 
@@ -424,8 +441,8 @@ class SceneBuilder:
         changes: list[str],
     ) -> None:
         """Connect a signal between nodes."""
-        target_path = op.get("target", "")
-        target = tree.get_node(target_path)
+        target_path = op.get("target", op.get("from", ""))
+        target = self._resolve_node(tree, target_path)
         if target is None:
             raise ValueError(f"Node not found: {target_path}")
 
