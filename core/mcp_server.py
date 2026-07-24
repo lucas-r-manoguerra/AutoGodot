@@ -38,6 +38,7 @@ if str(_PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(_PROJECT_ROOT))
 
 from core.godot_controller import GodotController  # noqa: E402
+from core.scene_builder import SceneBuilder  # noqa: E402
 from core.vision_qa import VisionQA  # noqa: E402
 
 # ---------------------------------------------------------------------------
@@ -65,6 +66,7 @@ logger.info("Godot project   : %s", GODOT_PROJECT)
 # ---------------------------------------------------------------------------
 godot = GodotController(godot_path=GODOT_PATH, project_dir=GODOT_PROJECT)
 vision = VisionQA()
+scene = SceneBuilder(project_dir=GODOT_PROJECT)
 
 # ---------------------------------------------------------------------------
 # MCP Server instance
@@ -140,6 +142,56 @@ class CaptureGameScreenInput(BaseModel):
         ge=10,
         le=100,
         description="JPEG compression quality (10–100).",
+    )
+
+
+class ReadSceneInput(BaseModel):
+    """Input for reading a .tscn scene file."""
+
+    scene_path: str = Field(
+        ...,
+        description=(
+            "Relative path to the .tscn file inside the Godot project. "
+            "Example: 'scenes/main.tscn'"
+        ),
+    )
+
+
+class CreateSceneInput(BaseModel):
+    """Input for creating a .tscn scene from a JSON definition."""
+
+    scene_path: str = Field(
+        ...,
+        description=(
+            "Relative path where the .tscn will be written. "
+            "Example: 'scenes/new_level.tscn'"
+        ),
+    )
+    definition: dict = Field(
+        ...,
+        description=(
+            "Scene definition with keys: nodes (list), resources (list), connections (list). "
+            "Each node needs: name, type, parent. Optional: properties, groups, script."
+        ),
+    )
+
+
+class ModifySceneInput(BaseModel):
+    """Input for modifying an existing .tscn scene."""
+
+    scene_path: str = Field(
+        ...,
+        description="Relative path to the .tscn file to modify.",
+    )
+    operations: list[dict] = Field(
+        ...,
+        description=(
+            "List of operations to apply. Each op has 'action' and relevant fields: "
+            "add_node: {action, name, type, parent, properties?}, "
+            "remove_node: {action, name}, "
+            "set_property: {action, node, property, value}, "
+            "connect_signal: {action, signal, from_node, to_node, to_method}"
+        ),
     )
 
 
@@ -290,6 +342,82 @@ async def capture_game_screen(
 
     except Exception as exc:
         msg = f"ERROR capturing screen: {exc}"
+        logger.error(msg)
+        return msg
+
+
+@mcp.tool()
+async def read_scene(scene_path: str) -> str:
+    """Read and parse a Godot .tscn scene file into structured JSON.
+
+    Parses the scene file and returns all nodes, resources, connections,
+    and header metadata. Use this to inspect the current state of a scene
+    before making modifications.
+
+    The scene_path is relative to the Godot project root.
+    Example: 'scenes/main.tscn'
+    """
+    logger.info("read_scene → %s", scene_path)
+
+    try:
+        parsed = scene.read(scene_path)
+        return str(parsed)
+
+    except Exception as exc:
+        msg = f"ERROR reading scene: {exc}"
+        logger.error(msg)
+        return msg
+
+
+@mcp.tool()
+async def create_scene(scene_path: str, definition: dict) -> str:
+    """Create a new .tscn scene file from a JSON definition.
+
+    Generates a valid Godot scene file with the specified nodes, resources,
+    and signal connections.
+
+    The definition should include:
+    - nodes: list of node dicts with name, type, parent, optional properties
+    - resources: (optional) list of resource dicts with id, type, properties
+    - connections: (optional) list of signal connection dicts
+
+    The scene_path is relative to the Godot project root.
+    Example: 'scenes/new_level.tscn'
+    """
+    logger.info(
+        "create_scene → %s (nodes=%d)", scene_path, len(definition.get("nodes", []))
+    )
+
+    try:
+        created_path = scene.create(scene_path, definition)
+        return f"Scene created: {created_path}"
+
+    except Exception as exc:
+        msg = f"ERROR creating scene: {exc}"
+        logger.error(msg)
+        return msg
+
+
+@mcp.tool()
+async def modify_scene(scene_path: str, operations: list[dict]) -> str:
+    """Modify an existing .tscn scene file with surgical operations.
+
+    Apply multiple operations in sequence to an existing scene:
+    - add_node: {action: 'add_node', name, type, parent, properties?: {}}
+    - remove_node: {action: 'remove_node', name}
+    - set_property: {action: 'set_property', node, property, value}
+    - connect_signal: {action: 'connect_signal', signal, from_node, to_node, to_method}
+
+    The scene_path is relative to the Godot project root.
+    """
+    logger.info("modify_scene → %s (ops=%d)", scene_path, len(operations))
+
+    try:
+        result = scene.modify(scene_path, operations)
+        return result
+
+    except Exception as exc:
+        msg = f"ERROR modifying scene: {exc}"
         logger.error(msg)
         return msg
 
