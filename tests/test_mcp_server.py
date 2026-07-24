@@ -204,8 +204,9 @@ class TestGdExplore:
         """gdexplore analyzes empty project."""
         monkeypatch.setattr("core.mcp_server.GODOT_PROJECT", tmp_godot_project)
 
-        from core.mcp_server import gdexplore
         import json
+
+        from core.mcp_server import gdexplore
 
         result = await gdexplore()
         data = json.loads(result)
@@ -226,8 +227,9 @@ class TestGdExplore:
             '[gd_scene load_steps=2]\n[node name="Player" type="CharacterBody2D"]'
         )
 
-        from core.mcp_server import gdexplore
         import json
+
+        from core.mcp_server import gdexplore
 
         result = await gdexplore()
         data = json.loads(result)
@@ -244,8 +246,9 @@ class TestGdExplore:
             "extends CharacterBody2D\nsignal health_changed\nfunc _ready():\n\thealth_changed.emit()"
         )
 
-        from core.mcp_server import gdexplore
         import json
+
+        from core.mcp_server import gdexplore
 
         result = await gdexplore()
         data = json.loads(result)
@@ -266,8 +269,9 @@ class TestGdOptimize:
             "extends CharacterBody2D\nvar health = 100\nvar speed = 200.0"
         )
 
-        from core.mcp_server import gdoptimize
         import json
+
+        from core.mcp_server import gdoptimize
 
         result = await gdoptimize()
         data = json.loads(result)
@@ -275,7 +279,9 @@ class TestGdOptimize:
         assert data["total_findings"] > 0
         assert any(f["issue"] == "Untyped variable" for f in data["findings"])
 
-    async def test_gdoptimize_finds_missing_collision(self, tmp_godot_project, monkeypatch):
+    async def test_gdoptimize_finds_missing_collision(
+        self, tmp_godot_project, monkeypatch
+    ):
         """gdoptimize finds physics body without collision."""
         monkeypatch.setattr("core.mcp_server.GODOT_PROJECT", tmp_godot_project)
 
@@ -285,22 +291,25 @@ class TestGdOptimize:
             '[gd_scene]\n[node name="Player" type="CharacterBody2D"]'
         )
 
-        from core.mcp_server import gdoptimize
         import json
+
+        from core.mcp_server import gdoptimize
 
         result = await gdoptimize()
         data = json.loads(result)
 
         assert any(
-            f["issue"] == "Physics body without collision shape" for f in data["findings"]
+            f["issue"] == "Physics body without collision shape"
+            for f in data["findings"]
         )
 
     async def test_gdoptimize_empty_project(self, tmp_godot_project, monkeypatch):
         """gdoptimize handles empty project."""
         monkeypatch.setattr("core.mcp_server.GODOT_PROJECT", tmp_godot_project)
 
-        from core.mcp_server import gdoptimize
         import json
+
+        from core.mcp_server import gdoptimize
 
         result = await gdoptimize()
         data = json.loads(result)
@@ -316,8 +325,9 @@ class TestGdValidate:
         """gdvalidate reports missing structure."""
         monkeypatch.setattr("core.mcp_server.GODOT_PROJECT", tmp_godot_project)
 
-        from core.mcp_server import gdvalidate
         import json
+
+        from core.mcp_server import gdvalidate
 
         result = await gdvalidate()
         data = json.loads(result)
@@ -341,8 +351,9 @@ class TestGdValidate:
             "extends CharacterBody2D\nvar health: int = 100"
         )
 
-        from core.mcp_server import gdvalidate
         import json
+
+        from core.mcp_server import gdvalidate
 
         result = await gdvalidate()
         data = json.loads(result)
@@ -358,8 +369,9 @@ class TestGdValidate:
         (tmp_godot_project / "scripts").mkdir()
         (tmp_godot_project / "scripts" / "My Script.gd").write_text("extends Node")
 
-        from core.mcp_server import gdvalidate
         import json
+
+        from core.mcp_server import gdvalidate
 
         result = await gdvalidate()
         data = json.loads(result)

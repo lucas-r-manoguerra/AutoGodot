@@ -916,7 +916,9 @@ async def gdexplore() -> str:
             suggestions.append("Add enemy scenes for gameplay challenge")
 
         # Check for UI
-        has_ui = any("ui" in f.name.lower() or "hud" in f.name.lower() for f in tscn_files)
+        has_ui = any(
+            "ui" in f.name.lower() or "hud" in f.name.lower() for f in tscn_files
+        )
         if has_ui:
             features_found.append("ui_scene")
         else:
@@ -1034,23 +1036,27 @@ async def gdoptimize() -> str:
                 for i, line in enumerate(lines, 1):
                     stripped = line.strip()
                     if stripped.startswith("var ") and ":" not in stripped:
-                        findings.append({
-                            "severity": "medium",
-                            "file": rel_path,
-                            "line": i,
-                            "issue": "Untyped variable",
-                            "fix": "Add type annotation (e.g., 'var health: int = 100')",
-                        })
+                        findings.append(
+                            {
+                                "severity": "medium",
+                                "file": rel_path,
+                                "line": i,
+                                "issue": "Untyped variable",
+                                "fix": "Add type annotation (e.g., 'var health: int = 100')",
+                            }
+                        )
 
                 # Check for missing @export
                 if "var " in content and "@export" not in content:
-                    findings.append({
-                        "severity": "low",
-                        "file": rel_path,
-                        "line": 0,
-                        "issue": "No @export variables",
-                        "fix": "Consider using @export for configurable properties",
-                    })
+                    findings.append(
+                        {
+                            "severity": "low",
+                            "file": rel_path,
+                            "line": 0,
+                            "issue": "No @export variables",
+                            "fix": "Consider using @export for configurable properties",
+                        }
+                    )
 
             except Exception:
                 pass
@@ -1063,27 +1069,35 @@ async def gdoptimize() -> str:
                 rel_path = str(tscn_file.relative_to(GODOT_PROJECT))
 
                 # Check for physics bodies without collision shapes
-                has_physics = "CharacterBody2D" in content or "CharacterBody3D" in content
-                has_collision = "CollisionShape2D" in content or "CollisionShape3D" in content
+                has_physics = (
+                    "CharacterBody2D" in content or "CharacterBody3D" in content
+                )
+                has_collision = (
+                    "CollisionShape2D" in content or "CollisionShape3D" in content
+                )
                 if has_physics and not has_collision:
-                    findings.append({
-                        "severity": "high",
-                        "file": rel_path,
-                        "line": 0,
-                        "issue": "Physics body without collision shape",
-                        "fix": "Add CollisionShape2D/3D node",
-                    })
+                    findings.append(
+                        {
+                            "severity": "high",
+                            "file": rel_path,
+                            "line": 0,
+                            "issue": "Physics body without collision shape",
+                            "fix": "Add CollisionShape2D/3D node",
+                        }
+                    )
 
                 # Check for missing visuals
                 has_visual = "Sprite2D" in content or "MeshInstance3D" in content
                 if has_physics and not has_visual:
-                    findings.append({
-                        "severity": "medium",
-                        "file": rel_path,
-                        "line": 0,
-                        "issue": "Physics body without visual representation",
-                        "fix": "Add Sprite2D or MeshInstance3D node",
-                    })
+                    findings.append(
+                        {
+                            "severity": "medium",
+                            "file": rel_path,
+                            "line": 0,
+                            "issue": "Physics body without visual representation",
+                            "fix": "Add Sprite2D or MeshInstance3D node",
+                        }
+                    )
 
             except Exception:
                 pass
@@ -1166,19 +1180,27 @@ async def gdvalidate() -> str:
                 content = tscn_file.read_text(encoding="utf-8")
                 rel_path = str(tscn_file.relative_to(GODOT_PROJECT))
 
-                has_physics = "CharacterBody2D" in content or "CharacterBody3D" in content
-                has_collision = "CollisionShape2D" in content or "CollisionShape3D" in content
+                has_physics = (
+                    "CharacterBody2D" in content or "CharacterBody3D" in content
+                )
+                has_collision = (
+                    "CollisionShape2D" in content or "CollisionShape3D" in content
+                )
                 has_visual = "Sprite2D" in content or "MeshInstance3D" in content
 
                 if has_physics:
                     if has_collision:
                         passed.append(f"Scene completeness: {rel_path} has collision")
                     else:
-                        errors.append(f"Scene completeness: {rel_path} missing collision")
+                        errors.append(
+                            f"Scene completeness: {rel_path} missing collision"
+                        )
                     if has_visual:
                         passed.append(f"Scene completeness: {rel_path} has visual")
                     else:
-                        warnings.append(f"Scene completeness: {rel_path} missing visual")
+                        warnings.append(
+                            f"Scene completeness: {rel_path} missing visual"
+                        )
 
             except Exception:
                 pass
@@ -1206,7 +1228,7 @@ async def gdvalidate() -> str:
 
         # Calculate score
         total = len(passed) + len(warnings) + len(errors)
-        score = int((len(passed) / total * 100)) if total > 0 else 0
+        score = int(len(passed) / total * 100) if total > 0 else 0
 
         response = {
             "project_path": str(GODOT_PROJECT),
