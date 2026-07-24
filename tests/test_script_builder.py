@@ -12,7 +12,6 @@ import pytest
 
 from core.script_builder import ScriptBuilder
 
-
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
@@ -211,24 +210,34 @@ class TestCreateScript:
 class TestReadScript:
     """AC-2: Parse GDScript to structured dict."""
 
-    def test_read_returns_dict(self, script_builder: ScriptBuilder, sample_gd_file: Path) -> None:
+    def test_read_returns_dict(
+        self, script_builder: ScriptBuilder, sample_gd_file: Path
+    ) -> None:
         result = script_builder.read("scripts/player.gd")
         assert isinstance(result, dict)
 
-    def test_read_extends(self, script_builder: ScriptBuilder, sample_gd_file: Path) -> None:
+    def test_read_extends(
+        self, script_builder: ScriptBuilder, sample_gd_file: Path
+    ) -> None:
         result = script_builder.read("scripts/player.gd")
         assert result.get("extends") == "CharacterBody2D"
 
-    def test_read_class_name(self, script_builder: ScriptBuilder, sample_gd_file: Path) -> None:
+    def test_read_class_name(
+        self, script_builder: ScriptBuilder, sample_gd_file: Path
+    ) -> None:
         result = script_builder.read("scripts/player.gd")
         assert result.get("class_name") == "Player"
 
-    def test_read_signals(self, script_builder: ScriptBuilder, sample_gd_file: Path) -> None:
+    def test_read_signals(
+        self, script_builder: ScriptBuilder, sample_gd_file: Path
+    ) -> None:
         result = script_builder.read("scripts/player.gd")
         assert "died" in result.get("signals", [])
         assert "health_changed" in result.get("signals", [])
 
-    def test_read_variables(self, script_builder: ScriptBuilder, sample_gd_file: Path) -> None:
+    def test_read_variables(
+        self, script_builder: ScriptBuilder, sample_gd_file: Path
+    ) -> None:
         result = script_builder.read("scripts/player.gd")
         variables = result.get("variables", [])
         assert len(variables) >= 2
@@ -236,13 +245,17 @@ class TestReadScript:
         assert "speed" in names
         assert "health" in names
 
-    def test_read_exported_variable(self, script_builder: ScriptBuilder, sample_gd_file: Path) -> None:
+    def test_read_exported_variable(
+        self, script_builder: ScriptBuilder, sample_gd_file: Path
+    ) -> None:
         result = script_builder.read("scripts/player.gd")
         variables = result.get("variables", [])
         speed_var = next(v for v in variables if v["name"] == "speed")
         assert speed_var.get("export") is True
 
-    def test_read_functions(self, script_builder: ScriptBuilder, sample_gd_file: Path) -> None:
+    def test_read_functions(
+        self, script_builder: ScriptBuilder, sample_gd_file: Path
+    ) -> None:
         result = script_builder.read("scripts/player.gd")
         functions = result.get("functions", [])
         assert len(functions) >= 2
@@ -250,7 +263,9 @@ class TestReadScript:
         assert "_ready" in names
         assert "take_damage" in names
 
-    def test_read_function_body(self, script_builder: ScriptBuilder, sample_gd_file: Path) -> None:
+    def test_read_function_body(
+        self, script_builder: ScriptBuilder, sample_gd_file: Path
+    ) -> None:
         result = script_builder.read("scripts/player.gd")
         functions = result.get("functions", [])
         take_damage = next(f for f in functions if f["name"] == "take_damage")
@@ -262,7 +277,9 @@ class TestReadScript:
         assert result.startswith("ERROR:")
         assert "not found" in result.lower()
 
-    def test_read_metadata(self, script_builder: ScriptBuilder, sample_gd_file: Path) -> None:
+    def test_read_metadata(
+        self, script_builder: ScriptBuilder, sample_gd_file: Path
+    ) -> None:
         result = script_builder.read("scripts/player.gd")
         metadata = result.get("metadata", {})
         assert "lines" in metadata
@@ -277,7 +294,9 @@ class TestReadScript:
 class TestModifyScript:
     """AC-3: Apply surgical modifications to GDScript."""
 
-    def test_add_signal(self, script_builder: ScriptBuilder, sample_gd_file: Path) -> None:
+    def test_add_signal(
+        self, script_builder: ScriptBuilder, sample_gd_file: Path
+    ) -> None:
         ops = [{"action": "add_signal", "name": "jumped"}]
         result = script_builder.modify("scripts/player.gd", ops)
         assert result.startswith("OK:")
@@ -285,22 +304,30 @@ class TestModifyScript:
         read_result = script_builder.read("scripts/player.gd")
         assert "jumped" in read_result.get("signals", [])
 
-    def test_remove_signal(self, script_builder: ScriptBuilder, sample_gd_file: Path) -> None:
+    def test_remove_signal(
+        self, script_builder: ScriptBuilder, sample_gd_file: Path
+    ) -> None:
         ops = [{"action": "remove_signal", "name": "died"}]
         result = script_builder.modify("scripts/player.gd", ops)
         assert result.startswith("OK:")
         read_result = script_builder.read("scripts/player.gd")
         assert "died" not in read_result.get("signals", [])
 
-    def test_add_variable(self, script_builder: ScriptBuilder, sample_gd_file: Path) -> None:
-        ops = [{"action": "add_variable", "name": "armor", "type": "int", "value": "50"}]
+    def test_add_variable(
+        self, script_builder: ScriptBuilder, sample_gd_file: Path
+    ) -> None:
+        ops = [
+            {"action": "add_variable", "name": "armor", "type": "int", "value": "50"}
+        ]
         result = script_builder.modify("scripts/player.gd", ops)
         assert result.startswith("OK:")
         read_result = script_builder.read("scripts/player.gd")
         names = [v["name"] for v in read_result.get("variables", [])]
         assert "armor" in names
 
-    def test_remove_variable(self, script_builder: ScriptBuilder, sample_gd_file: Path) -> None:
+    def test_remove_variable(
+        self, script_builder: ScriptBuilder, sample_gd_file: Path
+    ) -> None:
         ops = [{"action": "remove_variable", "name": "health"}]
         result = script_builder.modify("scripts/player.gd", ops)
         assert result.startswith("OK:")
@@ -308,7 +335,9 @@ class TestModifyScript:
         names = [v["name"] for v in read_result.get("variables", [])]
         assert "health" not in names
 
-    def test_add_function(self, script_builder: ScriptBuilder, sample_gd_file: Path) -> None:
+    def test_add_function(
+        self, script_builder: ScriptBuilder, sample_gd_file: Path
+    ) -> None:
         ops = [
             {
                 "action": "add_function",
@@ -323,7 +352,9 @@ class TestModifyScript:
         names = [f["name"] for f in read_result.get("functions", [])]
         assert "jump" in names
 
-    def test_remove_function(self, script_builder: ScriptBuilder, sample_gd_file: Path) -> None:
+    def test_remove_function(
+        self, script_builder: ScriptBuilder, sample_gd_file: Path
+    ) -> None:
         ops = [{"action": "remove_function", "name": "_ready"}]
         result = script_builder.modify("scripts/player.gd", ops)
         assert result.startswith("OK:")
@@ -331,7 +362,9 @@ class TestModifyScript:
         names = [f["name"] for f in read_result.get("functions", [])]
         assert "_ready" not in names
 
-    def test_replace_function_body(self, script_builder: ScriptBuilder, sample_gd_file: Path) -> None:
+    def test_replace_function_body(
+        self, script_builder: ScriptBuilder, sample_gd_file: Path
+    ) -> None:
         ops = [
             {
                 "action": "replace_function_body",
@@ -345,21 +378,27 @@ class TestModifyScript:
         content = path.read_text()
         assert "print('Hello')" in content
 
-    def test_set_extends(self, script_builder: ScriptBuilder, sample_gd_file: Path) -> None:
+    def test_set_extends(
+        self, script_builder: ScriptBuilder, sample_gd_file: Path
+    ) -> None:
         ops = [{"action": "set_extends", "value": "Node2D"}]
         result = script_builder.modify("scripts/player.gd", ops)
         assert result.startswith("OK:")
         read_result = script_builder.read("scripts/player.gd")
         assert read_result.get("extends") == "Node2D"
 
-    def test_set_class_name(self, script_builder: ScriptBuilder, sample_gd_file: Path) -> None:
+    def test_set_class_name(
+        self, script_builder: ScriptBuilder, sample_gd_file: Path
+    ) -> None:
         ops = [{"action": "set_class_name", "value": "Hero"}]
         result = script_builder.modify("scripts/player.gd", ops)
         assert result.startswith("OK:")
         read_result = script_builder.read("scripts/player.gd")
         assert read_result.get("class_name") == "Hero"
 
-    def test_multi_op_order(self, script_builder: ScriptBuilder, sample_gd_file: Path) -> None:
+    def test_multi_op_order(
+        self, script_builder: ScriptBuilder, sample_gd_file: Path
+    ) -> None:
         ops = [
             {"action": "add_signal", "name": "jumped"},
             {"action": "remove_signal", "name": "died"},
@@ -373,13 +412,17 @@ class TestModifyScript:
         names = [v["name"] for v in read_result.get("variables", [])]
         assert "mana" in names
 
-    def test_unknown_action_error(self, script_builder: ScriptBuilder, sample_gd_file: Path) -> None:
+    def test_unknown_action_error(
+        self, script_builder: ScriptBuilder, sample_gd_file: Path
+    ) -> None:
         ops = [{"action": "invalid_action"}]
         result = script_builder.modify("scripts/player.gd", ops)
         assert result.startswith("ERROR:")
         assert "unknown" in result.lower()
 
-    def test_ok_summary(self, script_builder: ScriptBuilder, sample_gd_file: Path) -> None:
+    def test_ok_summary(
+        self, script_builder: ScriptBuilder, sample_gd_file: Path
+    ) -> None:
         ops = [{"action": "add_signal", "name": "test_signal"}]
         result = script_builder.modify("scripts/player.gd", ops)
         assert "test_signal" in result
@@ -416,7 +459,9 @@ class TestRoundTrip:
 
         # Functions (compare names)
         read_func_names = [f["name"] for f in read_result.get("functions", [])]
-        expected_func_names = [f["name"] for f in sample_definition.get("functions", [])]
+        expected_func_names = [
+            f["name"] for f in sample_definition.get("functions", [])
+        ]
         assert read_func_names == expected_func_names
 
 
@@ -438,8 +483,11 @@ class TestErrorHandling:
         result = script_builder.read("nonexistent.gd")
         assert isinstance(result, str)
 
-    def test_read_result_is_serializable(self, script_builder: ScriptBuilder, sample_gd_file: Path) -> None:
+    def test_read_result_is_serializable(
+        self, script_builder: ScriptBuilder, sample_gd_file: Path
+    ) -> None:
         import json
+
         result = script_builder.read("scripts/player.gd")
         # Should be JSON serializable
         json.dumps(result)

@@ -521,7 +521,9 @@ async def create_script(script_path: str, definition: dict) -> str:
     Example: 'scripts/player.gd'
     """
     logger.info(
-        "create_script → %s (functions=%d)", script_path, len(definition.get("functions", []))
+        "create_script → %s (functions=%d)",
+        script_path,
+        len(definition.get("functions", [])),
     )
 
     try:

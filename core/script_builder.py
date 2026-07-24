@@ -13,7 +13,6 @@ Tools exposed:
 from __future__ import annotations
 
 import logging
-import os
 import re
 from pathlib import Path
 from typing import Any
@@ -458,15 +457,15 @@ class ScriptBuilder:
                 body_end = len(content)
 
             body_text = content[body_start:body_end]
-            body_lines = [
-                line for line in body_text.split("\n") if line.strip()
-            ]
+            body_lines = [line for line in body_text.split("\n") if line.strip()]
 
-            result["functions"].append({
-                "name": func_name,
-                "args": func_args,
-                "body": body_lines,
-            })
+            result["functions"].append(
+                {
+                    "name": func_name,
+                    "args": func_args,
+                    "body": body_lines,
+                }
+            )
 
         return result
 
@@ -578,9 +577,7 @@ class ScriptBuilder:
     # Modification (modify)
     # ------------------------------------------------------------------
 
-    def _apply_operation(
-        self, content: str, op: dict[str, Any]
-    ) -> tuple[str, str]:
+    def _apply_operation(self, content: str, op: dict[str, Any]) -> tuple[str, str]:
         """Apply a single operation to content. Returns (new_content, change_desc)."""
         action = op["action"]
 
@@ -671,7 +668,11 @@ class ScriptBuilder:
             new_content = content[: nl + 1] + line + content[nl:]
         else:
             # Insert after signals or extends/class_name
-            m = _RE_SIGNAL.search(content) or _RE_CLASS_NAME.search(content) or _RE_EXTENDS.search(content)
+            m = (
+                _RE_SIGNAL.search(content)
+                or _RE_CLASS_NAME.search(content)
+                or _RE_EXTENDS.search(content)
+            )
             if m:
                 end = m.end()
                 nl = content.find("\n", end)
@@ -725,17 +726,16 @@ class ScriptBuilder:
         start = m.start()
         # Find end: next func or EOF
         next_func = _RE_FUNC_START.search(content, m.end())
-        if next_func:
-            end = next_func.start()
-        else:
-            end = len(content)
+        end = next_func.start() if next_func else len(content)
 
         # Remove the function block and trailing blank lines
         new_content = content[:start] + content[end:]
         new_content = re.sub(r"\n{3,}", "\n\n", new_content)
         return new_content, f"removed function '{name}'"
 
-    def _op_replace_function_body(self, content: str, op: dict[str, Any]) -> tuple[str, str]:
+    def _op_replace_function_body(
+        self, content: str, op: dict[str, Any]
+    ) -> tuple[str, str]:
         name = op["name"]
         new_body = op.get("body", ["\tpass"])
 
@@ -754,17 +754,14 @@ class ScriptBuilder:
 
         # Find end: next func or EOF
         next_func = _RE_FUNC_START.search(content, m.end())
-        if next_func:
-            body_end = next_func.start()
-        else:
-            body_end = len(content)
+        body_end = next_func.start() if next_func else len(content)
 
         # Build new function
-        func_header = content[m.start():body_start]
+        func_header = content[m.start() : body_start]
         new_body_text = "\n".join(new_body)
         new_func = f"{func_header}\n{new_body_text}\n"
 
-        new_content = content[:m.start()] + new_func + content[body_end:]
+        new_content = content[: m.start()] + new_func + content[body_end:]
         return new_content, f"replaced body of '{name}'"
 
     def _op_set_extends(self, content: str, op: dict[str, Any]) -> tuple[str, str]:
@@ -773,7 +770,7 @@ class ScriptBuilder:
 
         m = _RE_EXTENDS.search(content)
         if m:
-            new_content = content[: m.start()] + new_line + content[m.end():]
+            new_content = content[: m.start()] + new_line + content[m.end() :]
         else:
             new_content = new_line + "\n" + content
 
@@ -785,7 +782,7 @@ class ScriptBuilder:
 
         m = _RE_CLASS_NAME.search(content)
         if m:
-            new_content = content[: m.start()] + new_line + content[m.end():]
+            new_content = content[: m.start()] + new_line + content[m.end() :]
         else:
             # Add after extends
             m2 = _RE_EXTENDS.search(content)
