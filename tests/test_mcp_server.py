@@ -195,3 +195,173 @@ class TestGdInit:
         assert (tmp_godot_project / "assets" / "sprites").is_dir()
         assert (tmp_godot_project / "assets" / "audio").is_dir()
         assert (tmp_godot_project / "assets" / "themes").is_dir()
+
+
+class TestGdExplore:
+    """Tests for gdexplore tool."""
+
+    async def test_gdexplore_empty_project(self, tmp_godot_project, monkeypatch):
+        """gdexplore analyzes empty project."""
+        monkeypatch.setattr("core.mcp_server.GODOT_PROJECT", tmp_godot_project)
+
+        from core.mcp_server import gdexplore
+        import json
+
+        result = await gdexplore()
+        data = json.loads(result)
+
+        assert "features_found" in data
+        assert "features_missing" in data
+        assert "suggestions" in data
+        assert data["total_scenes"] == 0
+        assert data["total_scripts"] == 0
+
+    async def test_gdexplore_with_player(self, tmp_godot_project, monkeypatch):
+        """gdexplore detects player scene."""
+        monkeypatch.setattr("core.mcp_server.GODOT_PROJECT", tmp_godot_project)
+
+        # Create a player scene
+        (tmp_godot_project / "scenes").mkdir()
+        (tmp_godot_project / "scenes" / "player.tscn").write_text(
+            '[gd_scene load_steps=2]\n[node name="Player" type="CharacterBody2D"]'
+        )
+
+        from core.mcp_server import gdexplore
+        import json
+
+        result = await gdexplore()
+        data = json.loads(result)
+
+        assert "player_scene" in data["features_found"]
+
+    async def test_gdexplore_with_signals(self, tmp_godot_project, monkeypatch):
+        """gdexplore detects signal system."""
+        monkeypatch.setattr("core.mcp_server.GODOT_PROJECT", tmp_godot_project)
+
+        # Create a script with signals
+        (tmp_godot_project / "scripts").mkdir()
+        (tmp_godot_project / "scripts" / "player.gd").write_text(
+            "extends CharacterBody2D\nsignal health_changed\nfunc _ready():\n\thealth_changed.emit()"
+        )
+
+        from core.mcp_server import gdexplore
+        import json
+
+        result = await gdexplore()
+        data = json.loads(result)
+
+        assert "signal_system" in data["features_found"]
+
+
+class TestGdOptimize:
+    """Tests for gdoptimize tool."""
+
+    async def test_gdoptimize_finds_untyped_vars(self, tmp_godot_project, monkeypatch):
+        """gdoptimize finds untyped variables."""
+        monkeypatch.setattr("core.mcp_server.GODOT_PROJECT", tmp_godot_project)
+
+        # Create script with untyped var
+        (tmp_godot_project / "scripts").mkdir()
+        (tmp_godot_project / "scripts" / "player.gd").write_text(
+            "extends CharacterBody2D\nvar health = 100\nvar speed = 200.0"
+        )
+
+        from core.mcp_server import gdoptimize
+        import json
+
+        result = await gdoptimize()
+        data = json.loads(result)
+
+        assert data["total_findings"] > 0
+        assert any(f["issue"] == "Untyped variable" for f in data["findings"])
+
+    async def test_gdoptimize_finds_missing_collision(self, tmp_godot_project, monkeypatch):
+        """gdoptimize finds physics body without collision."""
+        monkeypatch.setattr("core.mcp_server.GODOT_PROJECT", tmp_godot_project)
+
+        # Create scene with CharacterBody2D but no CollisionShape
+        (tmp_godot_project / "scenes").mkdir()
+        (tmp_godot_project / "scenes" / "player.tscn").write_text(
+            '[gd_scene]\n[node name="Player" type="CharacterBody2D"]'
+        )
+
+        from core.mcp_server import gdoptimize
+        import json
+
+        result = await gdoptimize()
+        data = json.loads(result)
+
+        assert any(
+            f["issue"] == "Physics body without collision shape" for f in data["findings"]
+        )
+
+    async def test_gdoptimize_empty_project(self, tmp_godot_project, monkeypatch):
+        """gdoptimize handles empty project."""
+        monkeypatch.setattr("core.mcp_server.GODOT_PROJECT", tmp_godot_project)
+
+        from core.mcp_server import gdoptimize
+        import json
+
+        result = await gdoptimize()
+        data = json.loads(result)
+
+        assert "findings" in data
+        assert isinstance(data["findings"], list)
+
+
+class TestGdValidate:
+    """Tests for gdvalidate tool."""
+
+    async def test_gdvalidate_empty_project(self, tmp_godot_project, monkeypatch):
+        """gdvalidate reports missing structure."""
+        monkeypatch.setattr("core.mcp_server.GODOT_PROJECT", tmp_godot_project)
+
+        from core.mcp_server import gdvalidate
+        import json
+
+        result = await gdvalidate()
+        data = json.loads(result)
+
+        assert "score" in data
+        assert "passed" in data
+        assert "warnings" in data
+        assert "errors" in data
+        # Should have errors for missing folders and project.godot
+        assert len(data["errors"]) > 0
+
+    async def test_gdvalidate_good_project(self, tmp_godot_project, monkeypatch):
+        """gdvalidate scores well-structured project."""
+        monkeypatch.setattr("core.mcp_server.GODOT_PROJECT", tmp_godot_project)
+
+        # Create proper structure
+        (tmp_godot_project / "scenes").mkdir()
+        (tmp_godot_project / "scripts").mkdir()
+        (tmp_godot_project / "project.godot").write_text("config_version=5")
+        (tmp_godot_project / "scripts" / "player.gd").write_text(
+            "extends CharacterBody2D\nvar health: int = 100"
+        )
+
+        from core.mcp_server import gdvalidate
+        import json
+
+        result = await gdvalidate()
+        data = json.loads(result)
+
+        assert data["score"] > 50
+        assert any("project.godot exists" in p for p in data["passed"])
+
+    async def test_gdvalidate_naming_check(self, tmp_godot_project, monkeypatch):
+        """gdvalidate checks naming conventions."""
+        monkeypatch.setattr("core.mcp_server.GODOT_PROJECT", tmp_godot_project)
+
+        # Create script with bad name
+        (tmp_godot_project / "scripts").mkdir()
+        (tmp_godot_project / "scripts" / "My Script.gd").write_text("extends Node")
+
+        from core.mcp_server import gdvalidate
+        import json
+
+        result = await gdvalidate()
+        data = json.loads(result)
+
+        assert any("not snake_case" in w for w in data["warnings"])
