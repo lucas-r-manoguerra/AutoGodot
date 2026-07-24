@@ -12,6 +12,7 @@ dependencies = [
     "Pillow>=10.0.0",
     "python-xlib>=0.33",
     "aiofiles>=23.0.0",
+    "godot-parser>=0.1.7",
 ]
 
 [project.optional-dependencies]

@@ -119,3 +119,47 @@ def mock_screen_capture(monkeypatch):
 
     mock_image_open = MagicMock(return_value=mock_image)
     monkeypatch.setattr("PIL.Image.open", mock_image_open)
+
+
+# ---------------------------------------------------------------------------
+# Scene Builder fixtures
+# ---------------------------------------------------------------------------
+
+SAMPLE_TSCN = """\
+[gd_scene load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://scripts/player.gd" id="1_abc"]
+[ext_resource type="Texture2D" path="res://assets/sprite.png" id="2_def"]
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_1"]
+radius = 32.0
+
+[node name="Main" type="Node2D"]
+
+[node name="Player" type="CharacterBody2D" parent="." groups=["player", "ally"]]
+position = Vector2(100, 200)
+script = ExtResource("1_abc")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="./Player"]
+shape = SubResource("CircleShape2D_1")
+
+[connection signal="died" from="Player" to="." method="_on_player_died"]
+"""
+
+
+@pytest.fixture
+def sample_tscn(tmp_godot_project: Path) -> Path:
+    """Write a sample .tscn file to the temp project and return its path."""
+    scenes_dir = tmp_godot_project / "scenes"
+    scenes_dir.mkdir()
+    scene_file = scenes_dir / "test_scene.tscn"
+    scene_file.write_text(SAMPLE_TSCN, encoding="utf-8")
+    return scene_file
+
+
+@pytest.fixture
+def scene_builder(tmp_godot_project: Path):
+    """Create a SceneBuilder with temp project."""
+    from core.scene_builder import SceneBuilder
+
+    return SceneBuilder(project_dir=tmp_godot_project)
