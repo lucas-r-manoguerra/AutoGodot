@@ -374,15 +374,39 @@ class SceneBuilder:
     # ------------------------------------------------------------------
 
     def _resolve_node(self, tree: Any, path: str) -> Any:
-        """Resolve a node by path, falling back to root name match.
+        """Resolve a node by path, with fallbacks for convenience.
 
-        tree.get_node(".") returns root, but tree.get_node("RootName") returns None.
-        This helper handles both cases.
+        Resolution order:
+        1. Exact path via tree.get_node(path) — handles "VBoxContainer/PlayButton"
+        2. Root name match — handles "RootName" when root can't be found by get_node
+        3. Recursive search by name — finds first node matching path anywhere in tree
         """
+        # 1. Try exact path
         node = tree.get_node(path)
-        if node is None and tree.root is not None and path == tree.root.name:
-            node = tree.root
-        return node
+        if node is not None:
+            return node
+
+        # 2. Root name fallback
+        if tree.root is not None and path == tree.root.name:
+            return tree.root
+
+        # 3. Recursive search by name (find first match)
+        if tree.root is not None:
+            node = self._find_node_by_name(tree.root, path)
+            if node is not None:
+                return node
+
+        return None
+
+    def _find_node_by_name(self, node: Any, name: str) -> Any:
+        """Recursively search for a node by name."""
+        if node.name == name:
+            return node
+        for child in node.get_children():
+            found = self._find_node_by_name(child, name)
+            if found is not None:
+                return found
+        return None
 
     def _op_add_node(self, tree: Any, op: dict[str, Any], changes: list[str]) -> None:
         """Add a node to the tree."""

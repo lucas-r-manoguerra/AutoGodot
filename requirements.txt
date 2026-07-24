@@ -10,5 +10,8 @@ python-xlib>=0.33
 # Godot scene parsing
 godot-parser>=0.1.7
 
+# GDScript parsing
+gdtoolkit==4.*
+
 # Utilities
 aiofiles>=23.0.0
