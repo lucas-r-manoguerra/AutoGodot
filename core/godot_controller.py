@@ -24,7 +24,11 @@ class GodotController:
     def __init__(self, godot_path: str, project_dir: Path) -> None:
         self.godot_path = godot_path
         self.project_dir = project_dir.resolve()
-        logger.info("GodotController initialized: %s (project: %s)", godot_path, self.project_dir)
+        logger.info(
+            "GodotController initialized: %s (project: %s)",
+            godot_path,
+            self.project_dir,
+        )
 
     async def run_project(
         self,
@@ -63,14 +67,21 @@ class GodotController:
                 )
             except asyncio.TimeoutError:
                 timed_out = True
-                logger.warning("Godot process timed out after %.1fs — killing PID %d", timeout, proc.pid)
+                logger.warning(
+                    "Godot process timed out after %.1fs — killing PID %d",
+                    timeout,
+                    proc.pid,
+                )
 
                 # Hard kill: no graceful shutdown, immediate termination
                 proc.kill()
                 await proc.wait()
 
                 stdout_bytes = b""
-                stderr_bytes = b"[TIMEOUT] Godot process was force-killed after %.1f seconds\n" % timeout
+                stderr_bytes = (
+                    b"[TIMEOUT] Godot process was force-killed after %.1f seconds\n"
+                    % timeout
+                )
 
             duration = time.monotonic() - start
 
@@ -102,11 +113,14 @@ class GodotController:
                 "timed_out": False,
             }
 
-    def _build_command(self, scene_path: str | None, extra_args: list[str]) -> list[str]:
+    def _build_command(
+        self, scene_path: str | None, extra_args: list[str]
+    ) -> list[str]:
         """Build the Godot CLI command array."""
         cmd = [
             self.godot_path,
-            "--path", str(self.project_dir),
+            "--path",
+            str(self.project_dir),
         ]
 
         if scene_path:

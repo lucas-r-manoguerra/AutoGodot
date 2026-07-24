@@ -2,9 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
-from pathlib import Path
-
 import pytest
 
 
@@ -49,6 +46,7 @@ class TestGodotControllerRunProject:
 
     async def test_run_project_file_not_found(self, godot_controller, monkeypatch):
         """FileNotFoundError returns error dict."""
+
         async def mock_create_not_found(*args, **kwargs):
             raise FileNotFoundError("godot4 not found")
 
@@ -61,6 +59,7 @@ class TestGodotControllerRunProject:
 
     async def test_run_project_generic_exception(self, godot_controller, monkeypatch):
         """Generic exception returns error dict."""
+
         async def mock_create_error(*args, **kwargs):
             raise RuntimeError("Something went wrong")
 

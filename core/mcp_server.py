@@ -19,17 +19,13 @@ Environment variables:
 
 from __future__ import annotations
 
-import asyncio
-import base64
 import logging
 import os
 import sys
 from pathlib import Path
-from typing import Optional
 
+from mcp.server.fastmcp import FastMCP
 from pydantic import BaseModel, Field
-
-from mcp.server.mcpserver import MCPServer
 
 # ---------------------------------------------------------------------------
 # Module-level imports for subsystems (lazy-loaded to fail gracefully)
@@ -41,8 +37,8 @@ _PROJECT_ROOT = _CORE_DIR.parent
 if str(_PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(_PROJECT_ROOT))
 
-from core.godot_controller import GodotController
-from core.vision_qa import VisionQA
+from core.godot_controller import GodotController  # noqa: E402
+from core.vision_qa import VisionQA  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # Logging
@@ -73,7 +69,7 @@ vision = VisionQA()
 # ---------------------------------------------------------------------------
 # MCP Server instance
 # ---------------------------------------------------------------------------
-mcp = MCPServer(
+mcp = FastMCP(
     "autogodot",
 )
 
@@ -105,7 +101,7 @@ class WriteGameFileInput(BaseModel):
 class RunGodotTestInput(BaseModel):
     """Input for running a Godot test scene or script."""
 
-    scene_path: Optional[str] = Field(
+    scene_path: str | None = Field(
         default=None,
         description=(
             "Relative path to a .tscn scene to run. "
@@ -171,7 +167,9 @@ async def write_game_file(
     # Resolve against project root and validate no path traversal
     target = (GODOT_PROJECT / file_path).resolve()
     if not str(target).startswith(str(GODOT_PROJECT)):
-        return f"ERROR: Path traversal detected. '{file_path}' escapes the project root."
+        return (
+            f"ERROR: Path traversal detected. '{file_path}' escapes the project root."
+        )
 
     try:
         # Create parent directories if requested
@@ -232,7 +230,11 @@ async def run_godot_test(
             f"--- Console Output ---\n{output}"
         )
 
-        logger.info("run_godot_test completed: exit=%d duration=%.2fs", result["returncode"], result["duration"])
+        logger.info(
+            "run_godot_test completed: exit=%d duration=%.2fs",
+            result["returncode"],
+            result["duration"],
+        )
         return summary
 
     except Exception as exc:
@@ -257,7 +259,9 @@ async def capture_game_screen(
 
     Returns a JSON string with the Base64 image data and metadata.
     """
-    logger.info("capture_game_screen → max=%dx%d quality=%d", max_width, max_height, quality)
+    logger.info(
+        "capture_game_screen → max=%dx%d quality=%d", max_width, max_height, quality
+    )
 
     try:
         result = await vision.capture_screen(
@@ -276,8 +280,12 @@ async def capture_game_screen(
             "base64_data": result["base64"],
         }
 
-        logger.info("capture_screen completed: %dx%d (%d bytes base64)",
-                     result["width"], result["height"], len(result["base64"]))
+        logger.info(
+            "capture_screen completed: %dx%d (%d bytes base64)",
+            result["width"],
+            result["height"],
+            len(result["base64"]),
+        )
         return str(response)
 
     except Exception as exc:
@@ -289,6 +297,7 @@ async def capture_game_screen(
 # ===========================================================================
 # Entry point
 # ===========================================================================
+
 
 def main() -> None:
     """Run the MCP server over stdio transport."""

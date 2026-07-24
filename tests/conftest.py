@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 from pathlib import Path
 from typing import Any
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -15,9 +15,7 @@ def tmp_godot_project(tmp_path: Path) -> Path:
     """Create a temporary Godot project directory."""
     project_dir = tmp_path / "godot_project"
     project_dir.mkdir()
-    (project_dir / "project.godot").write_text(
-        '[gd_resource type="ProjectSettings"]\n'
-    )
+    (project_dir / "project.godot").write_text('[gd_resource type="ProjectSettings"]\n')
     return project_dir
 
 
@@ -51,7 +49,9 @@ def mock_subprocess(monkeypatch):
         return mock_proc
 
     # Patch at the module level where it's used
-    monkeypatch.setattr("core.godot_controller.asyncio.create_subprocess_exec", mock_create)
+    monkeypatch.setattr(
+        "core.godot_controller.asyncio.create_subprocess_exec", mock_create
+    )
 
 
 @pytest.fixture
@@ -72,23 +72,20 @@ def mock_subprocess_timeout(monkeypatch):
         mock_proc.wait = AsyncMock()
         return mock_proc
 
-    monkeypatch.setattr("core.godot_controller.asyncio.create_subprocess_exec", mock_create)
+    monkeypatch.setattr(
+        "core.godot_controller.asyncio.create_subprocess_exec", mock_create
+    )
 
 
 @pytest.fixture
 def mock_screen_capture(monkeypatch):
     """Mock mss and PIL for VisionQA tests."""
     # Create a proper PNG-like bytes for mss.tools.to_png
-    fake_png = (
-        b"\x89PNG\r\n\x1a\n"  # PNG signature
-        + b"\x00" * 100  # Dummy data
-    )
+    fake_png = b"\x89PNG\r\n\x1a\n" + b"\x00" * 100  # PNG signature  # Dummy data
 
     # Mock mss
     mock_mss_instance = MagicMock()
-    mock_mss_instance.monitors = [
-        {"top": 0, "left": 0, "width": 1920, "height": 1080}
-    ]
+    mock_mss_instance.monitors = [{"top": 0, "left": 0, "width": 1920, "height": 1080}]
 
     # Create a fake screenshot with RGB data
     mock_screenshot = MagicMock()
