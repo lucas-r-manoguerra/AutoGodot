@@ -109,8 +109,12 @@ class TestGdInit:
     async def test_gdinit_creates_project_2d(self, tmp_godot_project, monkeypatch):
         """gdinit creates a complete 2D project structure."""
         monkeypatch.setattr("core.mcp_server.GODOT_PROJECT", tmp_godot_project)
-        monkeypatch.setattr("core.mcp_server.scene", 
-                          __import__("core.scene_builder", fromlist=["SceneBuilder"]).SceneBuilder(tmp_godot_project))
+        monkeypatch.setattr(
+            "core.mcp_server.scene",
+            __import__("core.scene_builder", fromlist=["SceneBuilder"]).SceneBuilder(
+                tmp_godot_project
+            ),
+        )
 
         from core.mcp_server import gdinit
         import json
@@ -132,8 +136,12 @@ class TestGdInit:
     async def test_gdinit_creates_project_3d(self, tmp_godot_project, monkeypatch):
         """gdinit creates a complete 3D project structure."""
         monkeypatch.setattr("core.mcp_server.GODOT_PROJECT", tmp_godot_project)
-        monkeypatch.setattr("core.mcp_server.scene", 
-                          __import__("core.scene_builder", fromlist=["SceneBuilder"]).SceneBuilder(tmp_godot_project))
+        monkeypatch.setattr(
+            "core.mcp_server.scene",
+            __import__("core.scene_builder", fromlist=["SceneBuilder"]).SceneBuilder(
+                tmp_godot_project
+            ),
+        )
 
         from core.mcp_server import gdinit
         import json
@@ -169,8 +177,12 @@ class TestGdInit:
     async def test_gdinit_creates_folders(self, tmp_godot_project, monkeypatch):
         """gdinit creates all required folders."""
         monkeypatch.setattr("core.mcp_server.GODOT_PROJECT", tmp_godot_project)
-        monkeypatch.setattr("core.mcp_server.scene", 
-                          __import__("core.scene_builder", fromlist=["SceneBuilder"]).SceneBuilder(tmp_godot_project))
+        monkeypatch.setattr(
+            "core.mcp_server.scene",
+            __import__("core.scene_builder", fromlist=["SceneBuilder"]).SceneBuilder(
+                tmp_godot_project
+            ),
+        )
 
         from core.mcp_server import gdinit
 

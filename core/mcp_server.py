@@ -722,28 +722,48 @@ async def gdinit(project_name: str, project_type: str = "2d") -> str:
             created_files.append(f"{folder}/")
 
         # 2. Create project.godot
-        template = PROJECT_GODOT_TEMPLATE_3D if project_type == "3d" else PROJECT_GODOT_TEMPLATE_2D
+        template = (
+            PROJECT_GODOT_TEMPLATE_3D
+            if project_type == "3d"
+            else PROJECT_GODOT_TEMPLATE_2D
+        )
         project_godot = template.format(project_name=project_name)
         (GODOT_PROJECT / "project.godot").write_text(project_godot, encoding="utf-8")
         created_files.append("project.godot")
 
         # 3. Create player script
         player_script = PLAYER_SCRIPT_3D if project_type == "3d" else PLAYER_SCRIPT_2D
-        (GODOT_PROJECT / "scripts" / "player.gd").write_text(player_script, encoding="utf-8")
+        (GODOT_PROJECT / "scripts" / "player.gd").write_text(
+            player_script, encoding="utf-8"
+        )
         created_files.append("scripts/player.gd")
 
         # 4. Create game manager script
-        (GODOT_PROJECT / "scripts" / "game_manager.gd").write_text(GAME_MANAGER_SCRIPT, encoding="utf-8")
+        (GODOT_PROJECT / "scripts" / "game_manager.gd").write_text(
+            GAME_MANAGER_SCRIPT, encoding="utf-8"
+        )
         created_files.append("scripts/game_manager.gd")
 
         # 5. Create player scene
         if project_type == "3d":
             player_scene = {
                 "nodes": [
-                    {"name": "Player", "type": "CharacterBody3D", "parent": ".",
-                     "properties": {"script": "res://scripts/player.gd"}},
-                    {"name": "CollisionShape3D", "type": "CollisionShape3D", "parent": "Player"},
-                    {"name": "MeshInstance3D", "type": "MeshInstance3D", "parent": "Player"},
+                    {
+                        "name": "Player",
+                        "type": "CharacterBody3D",
+                        "parent": ".",
+                        "properties": {"script": "res://scripts/player.gd"},
+                    },
+                    {
+                        "name": "CollisionShape3D",
+                        "type": "CollisionShape3D",
+                        "parent": "Player",
+                    },
+                    {
+                        "name": "MeshInstance3D",
+                        "type": "MeshInstance3D",
+                        "parent": "Player",
+                    },
                 ],
                 "resources": [],
                 "connections": [],
@@ -751,9 +771,17 @@ async def gdinit(project_name: str, project_type: str = "2d") -> str:
         else:
             player_scene = {
                 "nodes": [
-                    {"name": "Player", "type": "CharacterBody2D", "parent": ".",
-                     "properties": {"script": "res://scripts/player.gd"}},
-                    {"name": "CollisionShape2D", "type": "CollisionShape2D", "parent": "Player"},
+                    {
+                        "name": "Player",
+                        "type": "CharacterBody2D",
+                        "parent": ".",
+                        "properties": {"script": "res://scripts/player.gd"},
+                    },
+                    {
+                        "name": "CollisionShape2D",
+                        "type": "CollisionShape2D",
+                        "parent": "Player",
+                    },
                     {"name": "Sprite2D", "type": "Sprite2D", "parent": "Player"},
                 ],
                 "resources": [],
@@ -767,11 +795,27 @@ async def gdinit(project_name: str, project_type: str = "2d") -> str:
             main_scene = {
                 "nodes": [
                     {"name": "Main", "type": "Node3D", "parent": "."},
-                    {"name": "Player", "type": "CharacterBody3D", "parent": ".",
-                     "properties": {"script": "res://scripts/player.gd"}},
-                    {"name": "CollisionShape3D", "type": "CollisionShape3D", "parent": "Player"},
-                    {"name": "MeshInstance3D", "type": "MeshInstance3D", "parent": "Player"},
-                    {"name": "DirectionalLight3D", "type": "DirectionalLight3D", "parent": "."},
+                    {
+                        "name": "Player",
+                        "type": "CharacterBody3D",
+                        "parent": ".",
+                        "properties": {"script": "res://scripts/player.gd"},
+                    },
+                    {
+                        "name": "CollisionShape3D",
+                        "type": "CollisionShape3D",
+                        "parent": "Player",
+                    },
+                    {
+                        "name": "MeshInstance3D",
+                        "type": "MeshInstance3D",
+                        "parent": "Player",
+                    },
+                    {
+                        "name": "DirectionalLight3D",
+                        "type": "DirectionalLight3D",
+                        "parent": ".",
+                    },
                     {"name": "Camera3D", "type": "Camera3D", "parent": "."},
                 ],
                 "resources": [],
@@ -780,11 +824,23 @@ async def gdinit(project_name: str, project_type: str = "2d") -> str:
         else:
             main_scene = {
                 "nodes": [
-                    {"name": "Main", "type": "Node2D", "parent": ".",
-                     "properties": {"script": "res://scripts/game_manager.gd"}},
-                    {"name": "Player", "type": "CharacterBody2D", "parent": ".",
-                     "properties": {"script": "res://scripts/player.gd"}},
-                    {"name": "CollisionShape2D", "type": "CollisionShape2D", "parent": "Player"},
+                    {
+                        "name": "Main",
+                        "type": "Node2D",
+                        "parent": ".",
+                        "properties": {"script": "res://scripts/game_manager.gd"},
+                    },
+                    {
+                        "name": "Player",
+                        "type": "CharacterBody2D",
+                        "parent": ".",
+                        "properties": {"script": "res://scripts/player.gd"},
+                    },
+                    {
+                        "name": "CollisionShape2D",
+                        "type": "CollisionShape2D",
+                        "parent": "Player",
+                    },
                     {"name": "Sprite2D", "type": "Sprite2D", "parent": "Player"},
                     {"name": "Camera2D", "type": "Camera2D", "parent": "Player"},
                 ],
@@ -795,6 +851,7 @@ async def gdinit(project_name: str, project_type: str = "2d") -> str:
         created_files.append("scenes/main.tscn")
 
         import json
+
         response = {
             "status": "success",
             "project_name": project_name,
