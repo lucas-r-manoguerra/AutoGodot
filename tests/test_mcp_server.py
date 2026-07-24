@@ -2,13 +2,11 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-
 import pytest
 
 # Skip all MCP server tests if mcp is not installed
 try:
-    from mcp.server.mcpserver import MCPServer
+    from mcp.server.fastmcp import FastMCP  # noqa: F401
 
     HAS_MCP = True
 except ImportError:

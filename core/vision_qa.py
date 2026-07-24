@@ -62,7 +62,9 @@ class VisionQA:
         if Image is None:
             raise RuntimeError("Pillow library not installed. Run: pip install Pillow")
 
-        logger.info("Capturing screen (max %dx%d, quality=%d)", max_width, max_height, quality)
+        logger.info(
+            "Capturing screen (max %dx%d, quality=%d)", max_width, max_height, quality
+        )
 
         # Capture the primary monitor
         with mss.mss() as sct:
@@ -72,7 +74,7 @@ class VisionQA:
 
             # Convert to PIL Image for resizing
             raw = mss.tools.to_png(screenshot.rgb, screenshot.size)
-            img = Image.open(io.BytesIO(raw))
+            img = Image.open(io.BytesIO(raw))  # type: ignore[arg-type]
 
         original_width, original_height = img.size
         logger.info("Captured %dx%d, resizing...", original_width, original_height)
@@ -82,7 +84,7 @@ class VisionQA:
         if ratio < 1.0:
             new_width = int(original_width * ratio)
             new_height = int(original_height * ratio)
-            img = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
+            img = img.resize((new_width, new_height), Image.Resampling.LANCZOS)  # type: ignore[assignment,union-attr]
         else:
             new_width, new_height = original_width, original_height
 
@@ -96,9 +98,12 @@ class VisionQA:
 
         logger.info(
             "Screen captured: %dx%d → %dx%d (%d bytes JPEG, %d bytes base64)",
-            original_width, original_height,
-            new_width, new_height,
-            len(jpeg_bytes), len(b64_string),
+            original_width,
+            original_height,
+            new_width,
+            new_height,
+            len(jpeg_bytes),
+            len(b64_string),
         )
 
         return {
