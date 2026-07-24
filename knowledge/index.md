@@ -20,6 +20,7 @@ concept before writing code to avoid well-known pitfalls.
 * [Checklists](checklists/index.md) - Mandatory node checklists for character scenes and project organization
 * [Reference](reference/index.md) - Physics, collision, exports, and node path conventions
 * [Scene](scene/index.md) - .tscn file anatomy and ext_resource patterns
+* [Guides](guides/index.md) - Step-by-step tutorials for common game features and workflows
 
 ## When to Use Each
 
@@ -36,6 +37,12 @@ concept before writing code to avoid well-known pitfalls.
 | Exposing variables to the Inspector | [reference/exported-vars.md](reference/exported-vars.md) |
 | Referencing nodes with $ or get_node() | [reference/node-paths.md](reference/node-paths.md) |
 | Building a new .tscn file from scratch | [scene/structures.md](scene/structures.md) |
+| Starting a new Godot project from zero | [guides/build-from-zero.md](guides/build-from-zero.md) |
+| Setting up testing infrastructure | [guides/add-testing.md](guides/add-testing.md) |
+| Adding physics and movement | [guides/add-physics.md](guides/add-physics.md) |
+| Creating inventory or dialogue systems | [guides/add-inventory.md](guides/add-inventory.md), [guides/add-dialogue.md](guides/add-dialogue.md) |
+| Building UI menus and HUD | [guides/build-main-menu.md](guides/build-main-menu.md), [guides/build-hud.md](guides/build-hud.md) |
+| Optimizing performance | [guides/optimize-2d.md](guides/optimize-2d.md), [guides/profile-performance.md](guides/profile-performance.md) |
 
 ## Top 5 Mistakes Agents Make
 
