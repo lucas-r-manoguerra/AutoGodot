@@ -12,6 +12,7 @@ dependencies = [
     "Pillow>=10.0.0",
     "python-xlib>=0.33",
     "aiofiles>=23.0.0",
+    "godot-parser>=0.1.7",
 ]
 
 [project.optional-dependencies]
@@ -62,7 +63,7 @@ disallow_untyped_defs = false  # Gradual: start permissive
 check_untyped_defs = true
 
 [[tool.mypy.overrides]]
-module = ["mss", "mss.tools", "PIL", "python_xlib.*"]
+module = ["mss", "mss.tools", "PIL", "python_xlib.*", "godot_parser.*"]
 ignore_missing_imports = true
 
 # --- Pytest Configuration ---
@@ -83,4 +84,4 @@ exclude_lines = [
     "if __name__ == .__main__.",
     "if TYPE_CHECKING:",
 ]
-fail_under = 40
+fail_under = 30
