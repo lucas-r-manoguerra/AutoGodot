@@ -17,7 +17,7 @@ import re
 from pathlib import Path
 from typing import Any
 
-from gdtoolkit.parser import parser as gd_parser
+from gdtoolkit.parser import parser as gd_parser  # type: ignore[import-untyped]
 
 logger = logging.getLogger(__name__)
 
@@ -267,7 +267,7 @@ class ScriptBuilder:
         if index < len(node.children):
             child = node.children[index]
             if hasattr(child, "value"):
-                return child.value
+                return str(child.value)
             return str(child)
         return ""
 
@@ -298,7 +298,7 @@ class ScriptBuilder:
         if hasattr(node, "children") and node.children:
             child = node.children[0]
             if hasattr(child, "value"):
-                return child.value
+                return str(child.value)
             elif hasattr(child, "data"):
                 return self._extract_expr(child)
         return ""
@@ -621,9 +621,11 @@ class ScriptBuilder:
             new_content = content[: nl + 1] + line + content[nl:]
         else:
             # Insert after extends/class_name or at top
-            m = _RE_EXTENDS.search(content) or _RE_CLASS_NAME.search(content)
-            if m:
-                end = m.end()
+            extends_match = _RE_EXTENDS.search(content)
+            class_match = _RE_CLASS_NAME.search(content)
+            insert_match = extends_match or class_match
+            if insert_match:
+                end = insert_match.end()
                 nl = content.find("\n", end)
                 if nl == -1:
                     nl = len(content)
@@ -668,13 +670,12 @@ class ScriptBuilder:
             new_content = content[: nl + 1] + line + content[nl:]
         else:
             # Insert after signals or extends/class_name
-            m = (
-                _RE_SIGNAL.search(content)
-                or _RE_CLASS_NAME.search(content)
-                or _RE_EXTENDS.search(content)
-            )
-            if m:
-                end = m.end()
+            signal_match = _RE_SIGNAL.search(content)
+            class_match = _RE_CLASS_NAME.search(content)
+            extends_match = _RE_EXTENDS.search(content)
+            insert_match = signal_match or class_match or extends_match
+            if insert_match:
+                end = insert_match.end()
                 nl = content.find("\n", end)
                 if nl == -1:
                     nl = len(content)
