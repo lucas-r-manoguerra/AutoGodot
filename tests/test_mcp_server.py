@@ -116,8 +116,9 @@ class TestGdInit:
             ),
         )
 
-        from core.mcp_server import gdinit
         import json
+
+        from core.mcp_server import gdinit
 
         result = await gdinit(project_name="test_game", project_type="2d")
         data = json.loads(result)
@@ -143,8 +144,9 @@ class TestGdInit:
             ),
         )
 
-        from core.mcp_server import gdinit
         import json
+
+        from core.mcp_server import gdinit
 
         result = await gdinit(project_name="test_game_3d", project_type="3d")
         data = json.loads(result)
