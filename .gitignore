@@ -28,6 +28,7 @@ Thumbs.db
 *.translation
 export.cfg
 export_presets.cfg
+test_project/
 
 # Environment
 .env

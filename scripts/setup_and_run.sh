@@ -3,7 +3,7 @@
 # AutoGodot — One-click setup & run for Ubuntu
 # =============================================================================
 # This script:
-#   1. Verifies system prerequisites (Python 3.10+, pip, Godot 4.x)
+#   1. Verifies system prerequisites (Python 3.10+, pip, Godot 4.7)
 #   2. Creates an isolated Python virtual environment (.venv)
 #   3. Installs all Python dependencies from requirements.txt
 #   4. Injects MCP server configuration into Claude Desktop's config file
@@ -14,7 +14,7 @@
 #   ./scripts/setup_and_run.sh
 #
 # Environment variables (all optional):
-#   GODOT_PATH       — Explicit path to the Godot 4.x executable
+#   GODOT_PATH       — Explicit path to the Godot 4.7 executable
 #   GODOT_PROJECT    — Path to the Godot project directory (default:cwd)
 #   SKIP_CLAUDE_CFG  — Set to 1 to skip Claude Desktop config injection
 #   CLAUDE_CFG_PATH  — Override the Claude Desktop config file path
@@ -91,7 +91,7 @@ fi
 log_ok "pip available"
 
 # --- Godot ---
-log_info "Checking Godot 4.x..."
+log_info "Checking Godot 4.7..."
 GODOT_EXECUTABLE=""
 
 # Priority: env var > common paths > PATH search
@@ -100,9 +100,9 @@ if [[ -n "${GODOT_PATH:-}" ]] && [[ -x "$GODOT_PATH" ]]; then
 elif command -v godot4 &>/dev/null; then
     GODOT_EXECUTABLE="$(command -v godot4)"
 elif command -v godot &>/dev/null; then
-    # Verify it's Godot 4.x (Godot 3 uses "godot", 4 uses "godot4" on some installs)
+    # Verify it's Godot 4.7+ (Godot 3 uses "godot", 4 uses "godot4" on some installs)
     godot_version_output="$(godot --version 2>&1 || true)"
-    if echo "$godot_version_output" | grep -qP '^4\.'; then
+    if echo "$godot_version_output" | grep -qP '^4\.[7-9]\.'; then
         GODOT_EXECUTABLE="$(command -v godot)"
     fi
 else
@@ -123,8 +123,8 @@ else
 fi
 
 if [[ -z "$GODOT_EXECUTABLE" ]]; then
-    log_warn "Godot 4.x not found. The MCP server will start but Godot tools will fail."
-    log_warn "Install Godot 4.x: https://godotengine.org/download/linux"
+    log_warn "Godot 4.7 not found. The MCP server will start but Godot tools will fail."
+    log_warn "Install Godot 4.7: https://godotengine.org/download/linux"
     GODOT_EXECUTABLE="godot4"  # Fallback — let it fail at runtime with a clear error
 else
     log_ok "Godot found at ${GODOT_EXECUTABLE}"

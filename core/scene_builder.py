@@ -13,6 +13,8 @@ Tools exposed:
 from __future__ import annotations
 
 import logging
+import os
+import subprocess
 from pathlib import Path
 from typing import Any
 
@@ -35,7 +37,30 @@ class SceneBuilder:
 
     def __init__(self, project_dir: Path) -> None:
         self.project_dir = project_dir.resolve()
-        logger.info("SceneBuilder initialized (project: %s)", self.project_dir)
+        self._godot_version = self._detect_godot_version()
+        logger.info(
+            "SceneBuilder initialized (project: %s, godot: %s)",
+            self.project_dir,
+            self._godot_version,
+        )
+
+    def _detect_godot_version(self) -> str:
+        """Detect installed Godot version from GODOT_PATH or PATH."""
+        godot_path = os.environ.get("GODOT_PATH", "godot")
+        try:
+            result = subprocess.run(
+                [godot_path, "--version"],
+                capture_output=True,
+                text=True,
+                timeout=5,
+            )
+            version = result.stdout.strip()
+            # Format: "4.7.stable.mono.official.5b4e0cb0f" → "4.7"
+            if version:
+                return version.split(".")[0] + "." + version.split(".")[1]
+        except (FileNotFoundError, subprocess.TimeoutExpired, IndexError):
+            pass
+        return "4.7"  # Fallback to current version
 
     # ------------------------------------------------------------------
     # Public API
@@ -92,8 +117,9 @@ class SceneBuilder:
 
         try:
             scene = GDScene()  # type: ignore[call-arg]
-            # Set format to 3 (Godot 4.x default)
+            # Set format to 3 (Godot 4.x default) and version
             scene._sections[0].header["format"] = 3
+            scene._sections[0].header["godot_version"] = self._godot_version
 
             # Add external resources
             for res in definition.get("resources", []):
@@ -212,7 +238,7 @@ class SceneBuilder:
         """Convert a parsed GDScene to the canonical JSON dict."""
         # Header
         header: dict[str, Any] = {
-            "godot_version": "4.2",
+            "godot_version": self._godot_version,
             "scene_format": 3,
         }
         for section in scene.get_sections():

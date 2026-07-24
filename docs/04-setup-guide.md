@@ -9,7 +9,7 @@ Step-by-step instructions to install and configure AutoGodot on Ubuntu.
 | Software | Version | Purpose |
 |----------|---------|---------|
 | **Python** | 3.10+ | MCP server runtime |
-| **Godot** | 4.x | Game engine (for running/testing games) |
+| **Godot** | 4.7 | Game engine (for running/testing games) |
 
 ### Optional (for Claude Desktop integration)
 
@@ -28,7 +28,7 @@ sudo apt update
 sudo apt install python3.10 python3.10-venv python3.10-dev
 ```
 
-## Step 2: Install Godot 4.x
+## Step 2: Install Godot 4.7
 
 ```bash
 # Option A: Download from official site
@@ -62,7 +62,7 @@ chmod +x scripts/setup_and_run.sh
 The script will:
 
 1. **Verify Python 3.10+** — Checks `python3` and `pip` are available
-2. **Verify Godot 4.x** — Searches common installation paths
+2. **Verify Godot 4.7** — Searches common installation paths
 3. **Create `.venv/`** — Isolated Python environment with all dependencies
 4. **Install dependencies** — `mcp`, `pydantic`, `mss`, `Pillow`, etc.
 5. **Inject Claude Desktop config** — Adds the MCP server to `~/.config/Claude/claude_desktop_config.json`
@@ -114,7 +114,7 @@ For Claude Desktop, manually add this to `~/.config/Claude/claude_desktop_config
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `GODOT_PATH` | `godot4` | Path to the Godot 4.x executable |
+| `GODOT_PATH` | `godot4` | Path to Godot 4.7 executable |
 | `GODOT_PROJECT` | `.` (current directory) | Path to the Godot project directory |
 | `SKIP_CLAUDE_CFG` | `0` | Set to `1` to skip Claude Desktop config injection |
 | `CLAUDE_CFG_PATH` | `~/.config/Claude/claude_desktop_config.json` | Override Claude Desktop config path |
@@ -157,7 +157,7 @@ ls /usr/bin/python*
 sudo apt install python3.10 python3.10-venv
 ```
 
-### "Godot 4.x not found"
+### "Godot 4.7 not found"
 
 ```bash
 # Check if Godot is installed
@@ -202,4 +202,4 @@ python core/mcp_server.py
 echo '{"jsonrpc":"2.0","id":1,"method":"tools/list"}' | python core/mcp_server.py
 ```
 
-You should see a JSON response listing the three tools.
+You should see a JSON response listing the eight tools.

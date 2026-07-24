@@ -16,7 +16,7 @@ This directory contains the complete technical documentation for the AutoGodot p
 
 ## Quick Reference
 
-**What is this?** A Python-based MCP server that lets AI agents (Claude Desktop, VS Code, etc.) autonomously program, design scenes, and run visual QA on Godot 4.x games.
+**What is this?** A Python-based MCP server that lets AI agents (Claude Desktop, VS Code, etc.) autonomously program, design scenes, and run visual QA on Godot 4.7 games.
 
 **How does it work?** The MCP server exposes three tools over stdio transport. AI agents call these tools to write game files, launch Godot processes, and capture screenshots for visual verification.
 

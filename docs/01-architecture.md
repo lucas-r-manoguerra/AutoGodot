@@ -4,7 +4,7 @@ This document describes the system architecture of AutoGodot, how the components
 
 ## System Overview
 
-AutoGodot is a Python-based MCP (Model Context Protocol) server that enables AI agents to interact with Godot 4.x game projects. The framework acts as a bridge between the AI agent (which speaks MCP) and the Godot engine (which speaks CLI/GDScript).
+AutoGodot is a Python-based MCP (Model Context Protocol) server that enables AI agents to interact with Godot 4.7 game projects. The framework acts as a bridge between the AI agent (which speaks MCP) and the Godot engine (which speaks CLI/GDScript).
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
