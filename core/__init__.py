@@ -1,0 +1,1 @@
+"""AutoGodot core package."""

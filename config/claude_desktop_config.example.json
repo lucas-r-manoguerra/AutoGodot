@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "autogodot": {
+      "command": "/path/to/autogodot/.venv/bin/python",
+      "args": ["/path/to/autogodot/core/mcp_server.py"],
+      "env": {
+        "GODOT_PATH": "godot4",
+        "GODOT_PROJECT": "/path/to/your/godot/project"
+      }
+    }
+  }
+}
