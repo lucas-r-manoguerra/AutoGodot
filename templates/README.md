@@ -7,25 +7,33 @@ template before writing code to avoid well-known pitfalls.
 
 | Template | Description |
 |----------|-------------|
-| [godot-4-migration.md](godot-4-migration.md) | Godot 3.x to 4.x API migration reference |
-| `gdscript-patterns.md` | GDScript idioms, signals, state machines *(planned)* |
-| `scene-structure.md` | Node hierarchy and scene composition *(planned)* |
-| `physics-collision.md` | Collision layers, masks, and bodies *(planned)* |
-| `ui-layout.md` | Control nodes, anchors, and responsive UI *(planned)* |
-| `resource-loading.md` | PackedScene, preload, and resource management *(planned)* |
-| `exported-vars.md` | @export, @onready, and Inspector integration *(planned)* |
+| [godot-4-migration.md](godot-4-migration.md) | Godot 3.x → 4.x API migration reference |
+| [script-patterns.md](script-patterns.md) | GDScript idioms: health, movement, spawn, signals |
+| [scene-structures.md](scene-structures.md) | `.tscn` file anatomy and ext_resource patterns |
+| [character-scene-checklist.md](character-scene-checklist.md) | Mandatory nodes for character scenes |
+| [physics-collision.md](physics-collision.md) | Collision layers, masks, and body types |
+| [ui-patterns.md](ui-patterns.md) | CanvasLayer, HUD layout, menus |
+| [resource-loading.md](resource-loading.md) | PackedScene, preload/load, .tres resources |
+| [exported-vars.md](exported-vars.md) | @export, @onready, Inspector integration |
+| [input-mapping.md](input-mapping.md) | Input Actions setup and reading input |
+| [node-paths.md](node-paths.md) | $, get_node(), groups, path conventions |
+| [project-structure.md](project-structure.md) | Folder layout, naming, scalability |
 
 ## When to Use Each
 
 | Situation | Template to load |
 |-----------|-----------------|
 | Porting a Godot 3.x project or script | `godot-4-migration.md` |
-| Writing GDScript with signals and state machines | `gdscript-patterns.md` |
-| Building a new scene tree from scratch | `scene-structure.md` |
-| Working with CharacterBody2D or RigidBody2D | `physics-collision.md` |
-| Creating HUD, menus, or responsive layouts | `ui-layout.md` |
+| Writing GDScript with signals and state machines | `script-patterns.md` |
+| Building a new `.tscn` file from scratch | `scene-structures.md` |
+| Creating a character scene (player, enemy, NPC) | `character-scene-checklist.md` |
+| Setting up collision layers and masks | `physics-collision.md` |
+| Creating HUD, menus, or responsive layouts | `ui-patterns.md` |
 | Instantiating scenes or loading assets at runtime | `resource-loading.md` |
 | Exposing variables to the Inspector | `exported-vars.md` |
+| Configuring keyboard/gamepad input | `input-mapping.md` |
+| Referencing nodes with $ or get_node() | `node-paths.md` |
+| Organizing project folders for scalability | `project-structure.md` |
 
 ## Top 5 Mistakes Agents Make
 
