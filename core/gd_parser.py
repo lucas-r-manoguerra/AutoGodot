@@ -59,7 +59,7 @@ class GDScriptValidator:
             }
 
         # Only validate .gd files
-        if not target.suffix == ".gd":
+        if target.suffix != ".gd":
             return {
                 "valid": True,
                 "errors": [],

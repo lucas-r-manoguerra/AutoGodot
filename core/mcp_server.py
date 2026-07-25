@@ -590,7 +590,9 @@ async def modify_script(script_path: str, operations: list[dict]) -> str:
                 error_msg = validation["errors"][0]["message"]
                 line_num = validation["errors"][0].get("line", 0)
                 result += f"\n⚠️ SYNTAX ERROR (line {line_num}): {error_msg}"
-                logger.warning("Syntax error after modify %s: %s", script_path, error_msg)
+                logger.warning(
+                    "Syntax error after modify %s: %s", script_path, error_msg
+                )
 
         return result
 
@@ -1259,7 +1261,9 @@ async def gdvalidate() -> str:
                     f"Syntax error: {result['file']} (line {line_num}): {error_msg}"
                 )
         else:
-            passed.append(f"Syntax validation: all {syntax_results['valid_files']} .gd files valid")
+            passed.append(
+                f"Syntax validation: all {syntax_results['valid_files']} .gd files valid"
+            )
 
         # Calculate score
         total = len(passed) + len(warnings) + len(errors)
@@ -1368,8 +1372,6 @@ def main() -> None:
 
     # Startup scan: validate all existing .gd files
     try:
-        import json
-
         syntax_results = validator.validate_project()
         if syntax_results["invalid_files"] > 0:
             logger.warning(

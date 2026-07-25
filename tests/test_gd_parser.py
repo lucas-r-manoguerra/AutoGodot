@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import pytest
-
 from core.gd_parser import GDScriptValidator
 
 
@@ -59,7 +57,9 @@ class TestGDScriptValidator:
         validator = GDScriptValidator(project_dir=tmp_godot_project)
 
         # Valid content
-        result = validator.validate_content("extends Node\n\nfunc _ready() -> void:\n\tpass")
+        result = validator.validate_content(
+            "extends Node\n\nfunc _ready() -> void:\n\tpass"
+        )
         assert result["valid"] is True
 
         # Invalid content

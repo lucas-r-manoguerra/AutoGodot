@@ -387,9 +387,9 @@ class TestGdCheck:
         monkeypatch.setattr("core.mcp_server.GODOT_PROJECT", tmp_godot_project)
         monkeypatch.setattr(
             "core.mcp_server.validator",
-            __import__("core.gd_parser", fromlist=["GDScriptValidator"]).GDScriptValidator(
-                project_dir=tmp_godot_project
-            ),
+            __import__(
+                "core.gd_parser", fromlist=["GDScriptValidator"]
+            ).GDScriptValidator(project_dir=tmp_godot_project),
         )
 
         # Create valid script
@@ -413,9 +413,9 @@ class TestGdCheck:
         monkeypatch.setattr("core.mcp_server.GODOT_PROJECT", tmp_godot_project)
         monkeypatch.setattr(
             "core.mcp_server.validator",
-            __import__("core.gd_parser", fromlist=["GDScriptValidator"]).GDScriptValidator(
-                project_dir=tmp_godot_project
-            ),
+            __import__(
+                "core.gd_parser", fromlist=["GDScriptValidator"]
+            ).GDScriptValidator(project_dir=tmp_godot_project),
         )
 
         # Create invalid script (missing colon after func)
@@ -439,9 +439,9 @@ class TestGdCheck:
         monkeypatch.setattr("core.mcp_server.GODOT_PROJECT", tmp_godot_project)
         monkeypatch.setattr(
             "core.mcp_server.validator",
-            __import__("core.gd_parser", fromlist=["GDScriptValidator"]).GDScriptValidator(
-                project_dir=tmp_godot_project
-            ),
+            __import__(
+                "core.gd_parser", fromlist=["GDScriptValidator"]
+            ).GDScriptValidator(project_dir=tmp_godot_project),
         )
 
         # Create multiple scripts
@@ -469,9 +469,9 @@ class TestGdCheck:
         monkeypatch.setattr("core.mcp_server.GODOT_PROJECT", tmp_godot_project)
         monkeypatch.setattr(
             "core.mcp_server.validator",
-            __import__("core.gd_parser", fromlist=["GDScriptValidator"]).GDScriptValidator(
-                project_dir=tmp_godot_project
-            ),
+            __import__(
+                "core.gd_parser", fromlist=["GDScriptValidator"]
+            ).GDScriptValidator(project_dir=tmp_godot_project),
         )
 
         import json
@@ -488,16 +488,14 @@ class TestGdCheck:
 class TestWriteGameFileValidation:
     """Tests for write_game_file syntax validation."""
 
-    async def test_write_gd_file_validates_syntax(
-        self, tmp_godot_project, monkeypatch
-    ):
+    async def test_write_gd_file_validates_syntax(self, tmp_godot_project, monkeypatch):
         """write_game_file validates .gd files after writing."""
         monkeypatch.setattr("core.mcp_server.GODOT_PROJECT", tmp_godot_project)
         monkeypatch.setattr(
             "core.mcp_server.validator",
-            __import__("core.gd_parser", fromlist=["GDScriptValidator"]).GDScriptValidator(
-                project_dir=tmp_godot_project
-            ),
+            __import__(
+                "core.gd_parser", fromlist=["GDScriptValidator"]
+            ).GDScriptValidator(project_dir=tmp_godot_project),
         )
 
         from core.mcp_server import write_game_file
@@ -518,9 +516,9 @@ class TestWriteGameFileValidation:
         monkeypatch.setattr("core.mcp_server.GODOT_PROJECT", tmp_godot_project)
         monkeypatch.setattr(
             "core.mcp_server.validator",
-            __import__("core.gd_parser", fromlist=["GDScriptValidator"]).GDScriptValidator(
-                project_dir=tmp_godot_project
-            ),
+            __import__(
+                "core.gd_parser", fromlist=["GDScriptValidator"]
+            ).GDScriptValidator(project_dir=tmp_godot_project),
         )
 
         from core.mcp_server import write_game_file
@@ -544,7 +542,7 @@ class TestWriteGameFileValidation:
 
         result = await write_game_file(
             file_path="scenes/main.tscn",
-            content="[gd_scene]\n\n[node name=\"Main\" type=\"Node\"]",
+            content='[gd_scene]\n\n[node name="Main" type="Node"]',
         )
 
         assert "OK:" in result
