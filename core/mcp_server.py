@@ -37,6 +37,7 @@ _PROJECT_ROOT = _CORE_DIR.parent
 if str(_PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(_PROJECT_ROOT))
 
+from core.gd_parser import GDScriptValidator  # noqa: E402
 from core.godot_controller import GodotController  # noqa: E402
 from core.scene_builder import SceneBuilder  # noqa: E402
 from core.script_builder import ScriptBuilder  # noqa: E402
@@ -69,6 +70,7 @@ godot = GodotController(godot_path=GODOT_PATH, project_dir=GODOT_PROJECT)
 vision = VisionQA()
 scene = SceneBuilder(project_dir=GODOT_PROJECT)
 script = ScriptBuilder(project_dir=GODOT_PROJECT)
+validator = GDScriptValidator(project_dir=GODOT_PROJECT)
 
 # ---------------------------------------------------------------------------
 # MCP Server instance
@@ -305,6 +307,16 @@ async def write_game_file(
 
         msg = f"OK: Wrote {size} bytes to {file_path}"
         logger.info(msg)
+
+        # Validate .gd files for syntax errors
+        if file_path.endswith(".gd"):
+            validation = validator.validate_file(file_path)
+            if not validation["valid"]:
+                error_msg = validation["errors"][0]["message"]
+                line_num = validation["errors"][0].get("line", 0)
+                msg += f"\n⚠️ SYNTAX ERROR (line {line_num}): {error_msg}"
+                logger.warning("Syntax error in %s: %s", file_path, error_msg)
+
         return msg
 
     except OSError as exc:
@@ -570,6 +582,16 @@ async def modify_script(script_path: str, operations: list[dict]) -> str:
 
     try:
         result = script.modify(script_path, operations)
+
+        # Validate .gd files for syntax errors after modification
+        if script_path.endswith(".gd"):
+            validation = validator.validate_file(script_path)
+            if not validation["valid"]:
+                error_msg = validation["errors"][0]["message"]
+                line_num = validation["errors"][0].get("line", 0)
+                result += f"\n⚠️ SYNTAX ERROR (line {line_num}): {error_msg}"
+                logger.warning("Syntax error after modify %s: %s", script_path, error_msg)
+
         return result
 
     except Exception as exc:
@@ -1135,6 +1157,7 @@ async def gdvalidate() -> str:
     - Naming conventions (snake_case files, PascalCase nodes)
     - Scene completeness (visual + collision pairs)
     - Script quality (extends, type hints)
+    - GDScript syntax validation for all .gd files
 
     Returns JSON with passed/warnings/errors and a score.
     """
@@ -1226,6 +1249,18 @@ async def gdvalidate() -> str:
             except Exception:
                 pass
 
+        # GDScript syntax validation
+        syntax_results = validator.validate_project()
+        if syntax_results["invalid_files"] > 0:
+            for result in syntax_results["results"]:
+                error_msg = result["errors"][0]["message"]
+                line_num = result["errors"][0].get("line", 0)
+                errors.append(
+                    f"Syntax error: {result['file']} (line {line_num}): {error_msg}"
+                )
+        else:
+            passed.append(f"Syntax validation: all {syntax_results['valid_files']} .gd files valid")
+
         # Calculate score
         total = len(passed) + len(warnings) + len(errors)
         score = int(len(passed) / total * 100) if total > 0 else 0
@@ -1236,6 +1271,11 @@ async def gdvalidate() -> str:
             "passed": passed,
             "warnings": warnings,
             "errors": errors,
+            "syntax_validation": {
+                "total_files": syntax_results["total_files"],
+                "valid_files": syntax_results["valid_files"],
+                "invalid_files": syntax_results["invalid_files"],
+            },
         }
 
         logger.info(
@@ -1253,6 +1293,70 @@ async def gdvalidate() -> str:
         return msg
 
 
+# ---------------------------------------------------------------------------
+# gdcheck — Syntax-only validation
+# ---------------------------------------------------------------------------
+
+
+class GdCheckInput(BaseModel):
+    """Input for syntax checking a single .gd file."""
+
+    file_path: str = Field(
+        ...,
+        description=(
+            "Relative path to the .gd file inside the Godot project. "
+            "Example: 'scripts/player.gd'"
+        ),
+    )
+
+
+@mcp.tool()
+async def gdcheck(file_path: str) -> str:
+    """Check GDScript syntax for a single file or all files.
+
+    Validates .gd files using gdtoolkit parser to catch syntax errors
+    before they reach the user. Use after creating or modifying scripts.
+
+    Args:
+        file_path: Relative path to a .gd file, or empty string to check all files.
+
+    Returns JSON with validation results.
+    """
+    logger.info("gdcheck → %s", file_path or "(all files)")
+
+    try:
+        import json
+
+        if file_path:
+            # Check single file
+            result = validator.validate_file(file_path)
+            response = {
+                "file": file_path,
+                "valid": result["valid"],
+                "errors": result["errors"],
+            }
+        else:
+            # Check all files
+            result = validator.validate_project()
+            response = {
+                "total_files": result["total_files"],
+                "valid_files": result["valid_files"],
+                "invalid_files": result["invalid_files"],
+                "errors": result["results"],
+            }
+
+        logger.info(
+            "gdcheck completed: valid=%s",
+            response.get("valid", response.get("valid_files", 0)),
+        )
+        return json.dumps(response, indent=2)
+
+    except Exception as exc:
+        msg = f"ERROR checking syntax: {exc}"
+        logger.error(msg)
+        return msg
+
+
 # ===========================================================================
 # Entry point
 # ===========================================================================
@@ -1261,6 +1365,34 @@ async def gdvalidate() -> str:
 def main() -> None:
     """Run the MCP server over stdio transport."""
     logger.info("Starting AutoGodot MCP server (stdio)...")
+
+    # Startup scan: validate all existing .gd files
+    try:
+        import json
+
+        syntax_results = validator.validate_project()
+        if syntax_results["invalid_files"] > 0:
+            logger.warning(
+                "Startup scan found %d files with syntax errors",
+                syntax_results["invalid_files"],
+            )
+            for result in syntax_results["results"]:
+                error_msg = result["errors"][0]["message"]
+                line_num = result["errors"][0].get("line", 0)
+                logger.warning(
+                    "  → %s (line %d): %s",
+                    result["file"],
+                    line_num,
+                    error_msg,
+                )
+        else:
+            logger.info(
+                "Startup scan: all %d .gd files valid",
+                syntax_results["valid_files"],
+            )
+    except Exception as exc:
+        logger.warning("Startup scan failed: %s", exc)
+
     try:
         mcp.run()
     except KeyboardInterrupt:

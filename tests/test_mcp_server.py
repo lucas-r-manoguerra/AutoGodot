@@ -377,3 +377,175 @@ class TestGdValidate:
         data = json.loads(result)
 
         assert any("not snake_case" in w for w in data["warnings"])
+
+
+class TestGdCheck:
+    """Tests for gdcheck tool."""
+
+    async def test_gdcheck_valid_file(self, tmp_godot_project, monkeypatch):
+        """gdcheck validates a valid .gd file."""
+        monkeypatch.setattr("core.mcp_server.GODOT_PROJECT", tmp_godot_project)
+        monkeypatch.setattr(
+            "core.mcp_server.validator",
+            __import__("core.gd_parser", fromlist=["GDScriptValidator"]).GDScriptValidator(
+                project_dir=tmp_godot_project
+            ),
+        )
+
+        # Create valid script
+        (tmp_godot_project / "scripts").mkdir()
+        (tmp_godot_project / "scripts" / "player.gd").write_text(
+            "extends CharacterBody2D\n\nvar health: int = 100\n\nfunc _ready() -> void:\n\tpass"
+        )
+
+        import json
+
+        from core.mcp_server import gdcheck
+
+        result = await gdcheck(file_path="scripts/player.gd")
+        data = json.loads(result)
+
+        assert data["valid"] is True
+        assert len(data["errors"]) == 0
+
+    async def test_gdcheck_invalid_file(self, tmp_godot_project, monkeypatch):
+        """gdcheck detects syntax errors."""
+        monkeypatch.setattr("core.mcp_server.GODOT_PROJECT", tmp_godot_project)
+        monkeypatch.setattr(
+            "core.mcp_server.validator",
+            __import__("core.gd_parser", fromlist=["GDScriptValidator"]).GDScriptValidator(
+                project_dir=tmp_godot_project
+            ),
+        )
+
+        # Create invalid script (missing colon after func)
+        (tmp_godot_project / "scripts").mkdir()
+        (tmp_godot_project / "scripts" / "bad.gd").write_text(
+            "extends Node\n\nfunc _ready()\n\tpass"
+        )
+
+        import json
+
+        from core.mcp_server import gdcheck
+
+        result = await gdcheck(file_path="scripts/bad.gd")
+        data = json.loads(result)
+
+        assert data["valid"] is False
+        assert len(data["errors"]) > 0
+
+    async def test_gdcheck_all_files(self, tmp_godot_project, monkeypatch):
+        """gdcheck validates all .gd files when no path given."""
+        monkeypatch.setattr("core.mcp_server.GODOT_PROJECT", tmp_godot_project)
+        monkeypatch.setattr(
+            "core.mcp_server.validator",
+            __import__("core.gd_parser", fromlist=["GDScriptValidator"]).GDScriptValidator(
+                project_dir=tmp_godot_project
+            ),
+        )
+
+        # Create multiple scripts
+        (tmp_godot_project / "scripts").mkdir()
+        (tmp_godot_project / "scripts" / "player.gd").write_text(
+            "extends CharacterBody2D\n\nvar health: int = 100"
+        )
+        (tmp_godot_project / "scripts" / "enemy.gd").write_text(
+            "extends CharacterBody2D\n\nvar damage: int = 10"
+        )
+
+        import json
+
+        from core.mcp_server import gdcheck
+
+        result = await gdcheck(file_path="")
+        data = json.loads(result)
+
+        assert data["total_files"] == 2
+        assert data["valid_files"] == 2
+        assert data["invalid_files"] == 0
+
+    async def test_gdcheck_nonexistent_file(self, tmp_godot_project, monkeypatch):
+        """gdcheck handles missing files."""
+        monkeypatch.setattr("core.mcp_server.GODOT_PROJECT", tmp_godot_project)
+        monkeypatch.setattr(
+            "core.mcp_server.validator",
+            __import__("core.gd_parser", fromlist=["GDScriptValidator"]).GDScriptValidator(
+                project_dir=tmp_godot_project
+            ),
+        )
+
+        import json
+
+        from core.mcp_server import gdcheck
+
+        result = await gdcheck(file_path="scripts/missing.gd")
+        data = json.loads(result)
+
+        assert data["valid"] is False
+        assert "not found" in data["errors"][0]["message"].lower()
+
+
+class TestWriteGameFileValidation:
+    """Tests for write_game_file syntax validation."""
+
+    async def test_write_gd_file_validates_syntax(
+        self, tmp_godot_project, monkeypatch
+    ):
+        """write_game_file validates .gd files after writing."""
+        monkeypatch.setattr("core.mcp_server.GODOT_PROJECT", tmp_godot_project)
+        monkeypatch.setattr(
+            "core.mcp_server.validator",
+            __import__("core.gd_parser", fromlist=["GDScriptValidator"]).GDScriptValidator(
+                project_dir=tmp_godot_project
+            ),
+        )
+
+        from core.mcp_server import write_game_file
+
+        # Write valid script
+        result = await write_game_file(
+            file_path="scripts/valid.gd",
+            content="extends Node\n\nfunc _ready() -> void:\n\tpass",
+        )
+
+        assert "OK:" in result
+        assert "SYNTAX ERROR" not in result
+
+    async def test_write_gd_file_reports_syntax_error(
+        self, tmp_godot_project, monkeypatch
+    ):
+        """write_game_file reports syntax errors for invalid .gd files."""
+        monkeypatch.setattr("core.mcp_server.GODOT_PROJECT", tmp_godot_project)
+        monkeypatch.setattr(
+            "core.mcp_server.validator",
+            __import__("core.gd_parser", fromlist=["GDScriptValidator"]).GDScriptValidator(
+                project_dir=tmp_godot_project
+            ),
+        )
+
+        from core.mcp_server import write_game_file
+
+        # Write invalid script (missing colon)
+        result = await write_game_file(
+            file_path="scripts/bad.gd",
+            content="extends Node\n\nfunc _ready()\n\tpass",
+        )
+
+        assert "OK:" in result
+        assert "SYNTAX ERROR" in result
+
+    async def test_write_non_gd_file_skips_validation(
+        self, tmp_godot_project, monkeypatch
+    ):
+        """write_game_file skips validation for non-.gd files."""
+        monkeypatch.setattr("core.mcp_server.GODOT_PROJECT", tmp_godot_project)
+
+        from core.mcp_server import write_game_file
+
+        result = await write_game_file(
+            file_path="scenes/main.tscn",
+            content="[gd_scene]\n\n[node name=\"Main\" type=\"Node\"]",
+        )
+
+        assert "OK:" in result
+        assert "SYNTAX ERROR" not in result
