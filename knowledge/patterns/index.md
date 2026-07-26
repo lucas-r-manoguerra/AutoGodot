@@ -14,3 +14,4 @@ generated:
 * [ui.md](ui.md) - CanvasLayer setup, HUD layout, menus, health bars
 * [resource-loading.md](resource-loading.md) - preload vs load, PackedScene, .tres resources, caching
 * [input-mapping.md](input-mapping.md) - Input Actions setup, reading input, gamepad support
+* [gotchas.md](gotchas.md) - Common pitfalls: rendering coverage, mixed indentation, class_name CLI, Godot 3→4 API migration, monolithic scripts

@@ -487,3 +487,105 @@ class TestIntegration:
         # Verify connections
         conns = parsed.get("connections", [])
         assert any(c.get("signal") == "died" for c in conns)
+
+
+# ---------------------------------------------------------------------------
+# _validate_hierarchy tests
+# ---------------------------------------------------------------------------
+
+
+class TestValidateHierarchy:
+    """Tests for SceneBuilder._validate_hierarchy()."""
+
+    def test_control_under_node2d_warns(self, scene_builder: SceneBuilder) -> None:
+        """ColorRect as child of Node2D triggers rendering gotcha warning."""
+        nodes = [
+            {"name": "Root", "type": "Node2D"},
+            {"name": "Background", "type": "ColorRect", "parent": "."},
+        ]
+        warnings = scene_builder._validate_hierarchy(nodes)
+        assert len(warnings) == 1
+        assert "ColorRect" in warnings[0]
+        assert "render ON TOP" in warnings[0]
+
+    def test_label_under_sprite2d_warns(self, scene_builder: SceneBuilder) -> None:
+        """Label under Sprite2D (CanvasItem2D) also triggers warning."""
+        nodes = [
+            {"name": "Root", "type": "Sprite2D"},
+            {"name": "NameLabel", "type": "Label", "parent": "."},
+        ]
+        warnings = scene_builder._validate_hierarchy(nodes)
+        assert len(warnings) == 1
+        assert "Label" in warnings[0]
+
+    def test_label_under_canvaslayer_no_warn(self, scene_builder: SceneBuilder) -> None:
+        """Label under CanvasLayer is fine — no warning."""
+        nodes = [
+            {"name": "Root", "type": "Node2D"},
+            {"name": "UI", "type": "CanvasLayer", "parent": "."},
+            {"name": "Score", "type": "Label", "parent": "./UI"},
+        ]
+        warnings = scene_builder._validate_hierarchy(nodes)
+        assert len(warnings) == 0
+
+    def test_node3d_under_node2d_warns(self, scene_builder: SceneBuilder) -> None:
+        """Node3D under Node2D triggers mixed-dimension warning."""
+        nodes = [
+            {"name": "Root", "type": "Node2D"},
+            {"name": "Mesh", "type": "Node3D", "parent": "."},
+        ]
+        warnings = scene_builder._validate_hierarchy(nodes)
+        assert any("Mixing 2D and 3D" in w for w in warnings)
+
+    def test_sprite2d_under_node3d_warns(self, scene_builder: SceneBuilder) -> None:
+        """Sprite2D under Node3D triggers mixed-dimension warning."""
+        nodes = [
+            {"name": "Root", "type": "Node3D"},
+            {"name": "Sprite", "type": "Sprite2D", "parent": "."},
+        ]
+        warnings = scene_builder._validate_hierarchy(nodes)
+        assert any("Mixing 2D and 3D" in w for w in warnings)
+
+    def test_collision_shape_without_body_warns(self, scene_builder: SceneBuilder) -> None:
+        """CollisionShape2D under Node2D (not a physics body) warns."""
+        nodes = [
+            {"name": "Root", "type": "Node2D"},
+            {"name": "Shape", "type": "CollisionShape2D", "parent": "."},
+        ]
+        warnings = scene_builder._validate_hierarchy(nodes)
+        assert any("should be a child of a CollisionObject" in w for w in warnings)
+
+    def test_collision_shape_under_body_ok(self, scene_builder: SceneBuilder) -> None:
+        """CollisionShape2D under CharacterBody2D is fine."""
+        nodes = [
+            {"name": "Root", "type": "CharacterBody2D"},
+            {"name": "Shape", "type": "CollisionShape2D", "parent": "."},
+        ]
+        warnings = scene_builder._validate_hierarchy(nodes)
+        assert len(warnings) == 0
+
+    def test_clean_hierarchy_no_warnings(self, scene_builder: SceneBuilder) -> None:
+        """Valid hierarchy produces zero warnings."""
+        nodes = [
+            {"name": "Root", "type": "Node2D"},
+            {"name": "Player", "type": "CharacterBody2D", "parent": "."},
+            {"name": "Shape", "type": "CollisionShape2D", "parent": "./Player"},
+            {"name": "UI", "type": "CanvasLayer", "parent": "."},
+            {"name": "Score", "type": "Label", "parent": "./UI"},
+        ]
+        warnings = scene_builder._validate_hierarchy(nodes)
+        assert len(warnings) == 0
+
+    def test_create_with_bad_hierarchy_returns_warnings(
+        self, scene_builder: SceneBuilder
+    ) -> None:
+        """create() returns warnings in result when hierarchy has issues."""
+        definition = {
+            "nodes": [
+                {"name": "Root", "type": "Node2D"},
+                {"name": "Background", "type": "ColorRect", "parent": "."},
+            ]
+        }
+        result = scene_builder.create("scenes/bad.tscn", definition)
+        # Should still create the scene (not block), but include warnings
+        assert "OK" in result

@@ -37,10 +37,13 @@ _PROJECT_ROOT = _CORE_DIR.parent
 if str(_PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(_PROJECT_ROOT))
 
+from core.auto_fixer import AutoFixer  # noqa: E402
+from core.error_parser import GodotErrorParser  # noqa: E402
 from core.gd_parser import GDScriptValidator  # noqa: E402
 from core.godot_controller import GodotController  # noqa: E402
 from core.scene_builder import SceneBuilder  # noqa: E402
 from core.script_builder import ScriptBuilder  # noqa: E402
+from core.test_runner import TestRunner  # noqa: E402
 from core.vision_qa import VisionQA  # noqa: E402
 
 # ---------------------------------------------------------------------------
@@ -71,6 +74,9 @@ vision = VisionQA()
 scene = SceneBuilder(project_dir=GODOT_PROJECT)
 script = ScriptBuilder(project_dir=GODOT_PROJECT)
 validator = GDScriptValidator(project_dir=GODOT_PROJECT)
+error_parser = GodotErrorParser(project_dir=GODOT_PROJECT)
+test_runner = TestRunner(godot_path=GODOT_PATH, project_dir=GODOT_PROJECT)
+auto_fixer = AutoFixer(project_dir=GODOT_PROJECT)
 
 # ---------------------------------------------------------------------------
 # MCP Server instance
@@ -308,8 +314,19 @@ async def write_game_file(
         msg = f"OK: Wrote {size} bytes to {file_path}"
         logger.info(msg)
 
-        # Validate .gd files for syntax errors
+        # For .gd files: auto-fix then validate
         if file_path.endswith(".gd"):
+            # Auto-fix indentation, typos, whitespace
+            fix_result = auto_fixer.fix_errors(file_path, [])
+            if fix_result.get("fixed"):
+                fixed_content = fix_result["new_content"]
+                target.write_text(fixed_content, encoding="utf-8")
+                size = target.stat().st_size
+                fixes = "; ".join(fix_result.get("fixes", []))
+                msg += f"\n🔧 Auto-fixed: {fixes}"
+                logger.info("Auto-fixed %s: %s", file_path, fixes)
+
+            # Validate syntax
             validation = validator.validate_file(file_path)
             if not validation["valid"]:
                 error_msg = validation["errors"][0]["message"]
@@ -553,6 +570,16 @@ async def create_script(script_path: str, definition: dict) -> str:
 
     try:
         result = script.create(script_path, definition)
+
+        # Auto-fix indentation and issues in generated script
+        if script_path.endswith(".gd"):
+            fix_result = auto_fixer.fix_errors(script_path, [])
+            if fix_result.get("fixed"):
+                target = (GODOT_PROJECT / script_path).resolve()
+                target.write_text(fix_result["new_content"], encoding="utf-8")
+                fixes = "; ".join(fix_result.get("fixes", []))
+                result += f"\n🔧 Auto-fixed: {fixes}"
+
         return result
 
     except Exception as exc:
@@ -1316,10 +1343,15 @@ class GdCheckInput(BaseModel):
 
 @mcp.tool()
 async def gdcheck(file_path: str) -> str:
-    """Check GDScript syntax for a single file or all files.
+    """Check GDScript syntax and semantics for a single file or all files.
 
-    Validates .gd files using gdtoolkit parser to catch syntax errors
-    before they reach the user. Use after creating or modifying scripts.
+    Validates .gd files using gdtoolkit parser for syntax errors,
+    plus semantic checks:
+    - Mixed indentation (tabs vs spaces)
+    - Missing extends/class_name declaration
+    - Files over 300 lines (monolithic, hard to debug)
+    - class_name usage (may fail in CLI without editor indexing)
+    - Common Godot API misuse patterns
 
     Args:
         file_path: Relative path to a .gd file, or empty string to check all files.
@@ -1330,23 +1362,110 @@ async def gdcheck(file_path: str) -> str:
 
     try:
         import json
+        import re
+
+        def _semantic_checks(content: str, fpath: str) -> list[dict]:
+            """Run semantic checks on GDScript content."""
+            issues: list[dict] = []
+            lines = content.split("\n")
+
+            # 1. Mixed indentation
+            has_tabs = any(l.startswith("\t") for l in lines if l.strip())
+            has_spaces = any(re.match(r"^    \S", l) for l in lines if l.strip())
+            if has_tabs and has_spaces:
+                issues.append({
+                    "type": "indentation",
+                    "severity": "error",
+                    "message": "Mixed tabs and spaces — causes parse errors in Godot 4.x",
+                })
+
+            # 2. Missing extends/class_name
+            if not re.search(r"^(extends|class_name)\s", content, re.MULTILINE):
+                issues.append({
+                    "type": "structure",
+                    "severity": "warning",
+                    "message": "Missing 'extends' or 'class_name' declaration",
+                })
+
+            # 3. Large monolithic file
+            if len(lines) > 300:
+                issues.append({
+                    "type": "maintainability",
+                    "severity": "warning",
+                    "message": f"File has {len(lines)} lines — consider splitting (one file = one task)",
+                })
+
+            # 4. class_name usage (CLI gotcha)
+            class_match = re.search(r"^class_name\s+(\w+)", content, re.MULTILINE)
+            if class_match:
+                issues.append({
+                    "type": "cli_compatibility",
+                    "severity": "info",
+                    "message": (
+                        f"class_name '{class_match.group(1)}' may not resolve in CLI runs. "
+                        "Use preload() for more reliable script references."
+                    ),
+                })
+
+            # 5. Common API misuse patterns
+            api_patterns = [
+                (r"move_and_slide\s*\([^)]+\)", "move_and_slide()",
+                 "Godot 4.x: move_and_slide() takes NO arguments. Velocity is a property."),
+                (r"\.connect\s*\(\s*['\"]", ".connect()",
+                 "Godot 4.x: Use signal.connect(callable) syntax, not string-based connect."),
+                (r"get_tree\(\)\.change_scene\s*\(", "change_scene",
+                 "Godot 4.x: Use get_tree().change_scene_to_file() or change_scene_to_packed()."),
+                (r"\bexport\s+var\b", "export var",
+                 "Godot 4.x: Use @export annotation, not 'export var' keyword."),
+                (r"\bonready\s+var\b", "onready var",
+                 "Godot 4.x: Use @onready annotation, not 'onready var' keyword."),
+            ]
+            for pattern, name, msg in api_patterns:
+                if re.search(pattern, content):
+                    issues.append({
+                        "type": "api_misuse",
+                        "severity": "warning",
+                        "message": f"{name}: {msg}",
+                    })
+
+            return issues
 
         if file_path:
-            # Check single file
             result = validator.validate_file(file_path)
+            # Add semantic checks
+            try:
+                full_path = GODOT_PROJECT / file_path
+                content = full_path.read_text(encoding="utf-8")
+                semantic = _semantic_checks(content, file_path)
+            except Exception:
+                semantic = []
+
             response = {
                 "file": file_path,
                 "valid": result["valid"],
                 "errors": result["errors"],
+                "semantic_issues": semantic,
             }
         else:
-            # Check all files
             result = validator.validate_project()
+            all_semantic = {}
+            for r in result.get("results", []):
+                fpath = r.get("file", "")
+                if fpath.endswith(".gd"):
+                    try:
+                        content = (GODOT_PROJECT / fpath).read_text(encoding="utf-8")
+                        issues = _semantic_checks(content, fpath)
+                        if issues:
+                            all_semantic[fpath] = issues
+                    except Exception:
+                        pass
+
             response = {
                 "total_files": result["total_files"],
                 "valid_files": result["valid_files"],
                 "invalid_files": result["invalid_files"],
                 "errors": result["results"],
+                "semantic_issues": all_semantic,
             }
 
         logger.info(
@@ -1359,6 +1478,316 @@ async def gdcheck(file_path: str) -> str:
         msg = f"ERROR checking syntax: {exc}"
         logger.error(msg)
         return msg
+
+
+# ---------------------------------------------------------------------------
+# godot_errors — Parse Godot error output
+# ---------------------------------------------------------------------------
+
+
+class GodotErrorsInput(BaseModel):
+    """Input for parsing Godot error output."""
+
+    stdout: str = Field(
+        default="",
+        description="Standard output from Godot process.",
+    )
+    stderr: str = Field(
+        default="",
+        description="Standard error from Godot process.",
+    )
+
+
+@mcp.tool()
+async def godot_errors(stdout: str = "", stderr: str = "") -> str:
+    """Parse Godot error output into structured, actionable information.
+
+    Extracts errors, warnings, stack traces, and maps them to specific files
+    and lines. Use this after run_godot_test to understand what went wrong.
+
+    Returns JSON with:
+    - errors: list of structured error dicts (message, file, line, type)
+    - warnings: list of warning strings
+    - stack_traces: list of function/file/line dicts
+    - has_errors: bool
+    - summary: human-readable error summary
+    """
+    logger.info(
+        "godot_errors → parsing output (stdout=%d, stderr=%d chars)",
+        len(stdout),
+        len(stderr),
+    )
+
+    try:
+        import json
+
+        result = error_parser.parse_output(stdout, stderr)
+        return json.dumps(result, indent=2)
+
+    except Exception as exc:
+        msg = f"ERROR parsing Godot output: {exc}"
+        logger.error(msg)
+        return msg
+
+
+# ---------------------------------------------------------------------------
+# run_tests — Run GdUnit4/Gut automated tests
+# ---------------------------------------------------------------------------
+
+
+class RunTestsInput(BaseModel):
+    """Input for running automated tests."""
+
+    test_type: str = Field(
+        default="auto",
+        description="Test framework: 'gdunit4', 'gut', or 'auto' (auto-detect).",
+    )
+    scene_path: str | None = Field(
+        default=None,
+        description="Specific test scene to run. If omitted, uses project's test scene.",
+    )
+    timeout_seconds: float = Field(
+        default=60.0,
+        ge=1.0,
+        le=300.0,
+        description="Maximum seconds before timeout.",
+    )
+
+
+@mcp.tool()
+async def run_tests(
+    test_type: str = "auto",
+    scene_path: str | None = None,
+    timeout_seconds: float = 60.0,
+) -> str:
+    """Run automated tests (GdUnit4 or Gut) and return structured results.
+
+    Executes the project's test suite and parses results into a structured
+    format with pass/fail counts, individual test results, and a summary.
+
+    Use 'auto' to auto-detect the installed test framework, or specify
+    'gdunit4' or 'gut' explicitly.
+
+    Returns JSON with:
+    - passed: int
+    - failed: int
+    - errors: list of failed test details
+    - results: list of individual test results
+    - summary: human-readable summary
+    - duration: float in seconds
+    - framework: 'gdunit4' or 'gut'
+    """
+    logger.info(
+        "run_tests → type=%s scene=%s timeout=%.1fs",
+        test_type,
+        scene_path or "(auto)",
+        timeout_seconds,
+    )
+
+    try:
+        import json
+
+        result = await test_runner.run_tests(
+            test_type=test_type,
+            scene_path=scene_path,
+            timeout=timeout_seconds,
+        )
+        return json.dumps(result, indent=2)
+
+    except Exception as exc:
+        msg = f"ERROR running tests: {exc}"
+        logger.error(msg)
+        return msg
+
+
+# ---------------------------------------------------------------------------
+# auto_fix — Fix common GDScript errors
+# ---------------------------------------------------------------------------
+
+
+class AutoFixInput(BaseModel):
+    """Input for auto-fixing a GDScript file."""
+
+    file_path: str = Field(
+        ...,
+        description=(
+            "Relative path to the .gd file to fix. " "Example: 'scripts/player.gd'"
+        ),
+    )
+
+
+@mcp.tool()
+async def auto_fix(file_path: str) -> str:
+    """Automatically fix common GDScript errors in a file.
+
+    Applies fixes for:
+    - Mixed indentation (tabs vs spaces)
+    - Missing colons after control flow statements
+    - Trailing whitespace
+    - Common typos (onredy, precess, phisics, etc.)
+    - Double spaces
+
+    Returns JSON with:
+    - fixed: bool (whether any fixes were applied)
+    - fixes: list of applied fix descriptions
+    - file_path: str
+    - new_content: str (fixed content)
+    """
+    logger.info("auto_fix → %s", file_path)
+
+    try:
+        import json
+
+        result = auto_fixer.validate_and_fix(file_path)
+        return json.dumps(result, indent=2)
+
+    except Exception as exc:
+        msg = f"ERROR auto-fixing: {exc}"
+        logger.error(msg)
+        return msg
+
+
+# ---------------------------------------------------------------------------
+# godot_gotchas — Common Godot pitfalls knowledge base
+# ---------------------------------------------------------------------------
+
+GODOT_GOTCHAS: list[dict[str, str]] = [
+    {
+        "category": "rendering",
+        "title": "Control child covers parent _draw()",
+        "problem": "A ColorRect/Label/Control as child of Node2D renders ON TOP of the parent's _draw(), making drawn content invisible.",
+        "solution": "Use CanvasLayer for UI elements. Draw backgrounds in _draw() instead of ColorRect children. Or set the Control's z_index to -1.",
+        "example": "BAD: Node2D -> ColorRect.  GOOD: Node2D + CanvasLayer -> ColorRect",
+    },
+    {
+        "category": "rendering",
+        "title": "2D and 3D nodes in same branch",
+        "problem": "Mixing Node2D and Node3D in the same parent-child branch causes rendering issues or invisible nodes.",
+        "solution": "Keep 2D and 3D in separate scene trees. Use separate root nodes for each dimension.",
+        "example": "BAD: Node3D -> Sprite2D.  GOOD: Separate Node2D and Node3D roots.",
+    },
+    {
+        "category": "indentation",
+        "title": "Mixed tabs and spaces",
+        "problem": "Godot 4.x GDScript rejects files with mixed indentation (tabs + spaces). Even one tab in a spaces file causes parse errors.",
+        "solution": "Use 4 spaces consistently. Never mix. Run auto_fix after writing .gd files.",
+        "example": "Line 1: '    var x' (spaces) + Line 2: '\\ty = 1' (tab) = PARSE ERROR",
+    },
+    {
+        "category": "indentation",
+        "title": "AI generates tabs when spaces expected",
+        "problem": "LLMs sometimes output tab characters in GDScript code. The write_game_file tool may pass them through.",
+        "solution": "Always run auto_fix after writing, or validate with gdcheck which detects mixed indentation.",
+        "example": "The auto_fix tool converts all tabs to 4 spaces automatically.",
+    },
+    {
+        "category": "architecture",
+        "title": "Monolithic scripts (300+ lines)",
+        "problem": "Large scripts are impossible to debug. When _draw() doesn't render, finding the root cause in 300 lines is painful.",
+        "solution": "One file = one task. Split into data, logic, rendering, UI. Use preload() to connect them.",
+        "example": "tetris_data.gd (constants) + tetris_board.gd (state) + tetris_draw.gd (rendering) + game.gd (orchestrator)",
+    },
+    {
+        "category": "cli",
+        "title": "class_name not indexed in CLI",
+        "problem": "Godot CLI doesn't index new scripts with class_name. References fail with 'Could not find type' errors.",
+        "solution": "Use preload('res://scripts/my_script.gd') instead of class_name for script references.",
+        "example": "BAD: class_name MyData (referenced as MyData).  GOOD: var D = preload('res://scripts/my_data.gd')",
+    },
+    {
+        "category": "api",
+        "title": "move_and_slide() signature changed in Godot 4",
+        "problem": "In Godot 3, move_and_slide(velocity). In Godot 4, move_and_slide() takes NO arguments — velocity is a property.",
+        "solution": "Set velocity property before calling move_and_slide(): velocity = direction * speed; move_and_slide()",
+        "example": "BAD: move_and_slide(dir * speed).  GOOD: velocity = dir * speed; move_and_slide()",
+    },
+    {
+        "category": "api",
+        "title": "String-based connect() deprecated in Godot 4",
+        "problem": "signal.connect('method_name', target) is Godot 3 syntax. Fails silently in Godot 4.",
+        "solution": "Use signal.connect(callable): signal.connect(target.method_name)",
+        "example": "BAD: connect('hit', self, '_on_hit').  GOOD: hit.connect(_on_hit)",
+    },
+    {
+        "category": "api",
+        "title": "export/onready are annotations in Godot 4",
+        "problem": "export var and onready var are Godot 3 syntax. Godot 4 uses @export and @onready.",
+        "solution": "Use @export var speed: float = 100.0 and @onready var sprite = $Sprite2D",
+        "example": "BAD: export var speed.  GOOD: @export var speed: float = 100.0",
+    },
+    {
+        "category": "physics",
+        "title": "CollisionShape needs CollisionObject parent",
+        "problem": "CollisionShape2D/3D nodes only work under CharacterBody, Area, StaticBody, or RigidBody nodes.",
+        "solution": "Always parent CollisionShape under a physics body node.",
+        "example": "BAD: Node2D -> CollisionShape2D.  GOOD: CharacterBody2D -> CollisionShape2D",
+    },
+    {
+        "category": "rendering",
+        "title": "CanvasLayer for HUD/overlay",
+        "problem": "UI elements drawn at the same z-level as game objects. Camera movement scrolls UI.",
+        "solution": "Put all HUD elements under a CanvasLayer node. It renders on a separate canvas layer.",
+        "example": "Root -> CanvasLayer -> Label (Score), Label (Health)",
+    },
+    {
+        "category": "scene",
+        "title": "unique_name_in_owner for %NodeName",
+        "problem": "Using %NodeName in @onready requires the node to have unique_name_in_owner=true in the .tscn.",
+        "solution": "Set 'unique_name_in_owner = true' on the node in the scene file, or use $path instead.",
+        "example": "In .tscn: [node name='ScoreLabel' ...] unique_name_in_owner = true",
+    },
+    {
+        "category": "performance",
+        "title": "queue_redraw() in _process() causes constant redraws",
+        "problem": "Calling queue_redraw() every frame means _draw() runs 60 times/sec. Fine for games, wasteful for static UI.",
+        "solution": "Only call queue_redraw() when state changes. For static content, _draw() is called once automatically.",
+        "example": "GOOD: queue_redraw() only when piece moves or board changes.",
+    },
+    {
+        "category": "debugging",
+        "title": "Godot CLI errors vs script errors",
+        "problem": "Godot outputs many engine-level errors (BUG: Unreferenced static string, RID leaks) that are NOT script errors.",
+        "solution": "Filter for 'SCRIPT ERROR' or 'game.gd' specifically. Engine cleanup messages at exit are normal.",
+        "example": "IGNORE: 'Pages in use exist at exit in PagedAllocator'. CHECK: 'SCRIPT ERROR: Parse Error'",
+    },
+]
+
+
+@mcp.tool()
+async def godot_gotchas(category: str = "", keyword: str = "") -> str:
+    """Query common Godot 4.x pitfalls and how to avoid them.
+
+    Based on real debugging sessions. Returns relevant gotchas filtered
+    by category (rendering, indentation, api, cli, physics, scene,
+    architecture, performance, debugging) or keyword search.
+
+    Args:
+        category: Filter by category (optional). Leave empty for all.
+        keyword: Search in title, problem, solution (optional).
+
+    Returns JSON with matching gotchas.
+    """
+    import json
+
+    results = GODOT_GOTCHAS
+
+    if category:
+        results = [g for g in results if g["category"] == category.lower()]
+
+    if keyword:
+        kw = keyword.lower()
+        results = [
+            g for g in results
+            if kw in g["title"].lower()
+            or kw in g["problem"].lower()
+            or kw in g["solution"].lower()
+            or kw in g["category"].lower()
+        ]
+
+    return json.dumps({
+        "total": len(results),
+        "gotchas": results,
+    }, indent=2)
 
 
 # ===========================================================================
