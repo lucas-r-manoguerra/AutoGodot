@@ -547,3 +547,228 @@ class TestWriteGameFileValidation:
 
         assert "OK:" in result
         assert "SYNTAX ERROR" not in result
+
+
+# ---------------------------------------------------------------------------
+# godot_gotchas tests
+# ---------------------------------------------------------------------------
+
+
+class TestGodotGotchas:
+    """Tests for the godot_gotchas tool."""
+
+    async def test_gotchas_returns_all(self):
+        """godot_gotchas returns all gotchas when no filter."""
+        from core.mcp_server import godot_gotchas
+
+        import json
+
+        result = await godot_gotchas(category="", keyword="")
+        data = json.loads(result)
+        assert data["total"] > 10
+        assert len(data["gotchas"]) == data["total"]
+
+    async def test_gotchas_filter_by_category(self):
+        """godot_gotchas filters by category."""
+        from core.mcp_server import godot_gotchas
+
+        import json
+
+        result = await godot_gotchas(category="rendering", keyword="")
+        data = json.loads(result)
+        assert data["total"] >= 3
+        for g in data["gotchas"]:
+            assert g["category"] == "rendering"
+
+    async def test_gotchas_filter_by_keyword(self):
+        """godot_gotchas filters by keyword search."""
+        from core.mcp_server import godot_gotchas
+
+        import json
+
+        result = await godot_gotchas(category="", keyword="ColorRect")
+        data = json.loads(result)
+        assert data["total"] >= 1
+        assert any("ColorRect" in g["title"] or "ColorRect" in g["problem"] for g in data["gotchas"])
+
+    async def test_gotchas_filter_combined(self):
+        """godot_gotchas with category AND keyword."""
+        from core.mcp_server import godot_gotchas
+
+        import json
+
+        result = await godot_gotchas(category="api", keyword="move_and_slide")
+        data = json.loads(result)
+        assert data["total"] == 1
+        assert "move_and_slide" in data["gotchas"][0]["title"]
+
+    async def test_gotchas_no_match(self):
+        """godot_gotchas returns empty for non-matching filter."""
+        from core.mcp_server import godot_gotchas
+
+        import json
+
+        result = await godot_gotchas(category="nonexistent", keyword="")
+        data = json.loads(result)
+        assert data["total"] == 0
+        assert data["gotchas"] == []
+
+    async def test_gotchas_each_has_required_fields(self):
+        """Every gotcha has title, problem, solution, example, category."""
+        from core.mcp_server import godot_gotchas, GODOT_GOTCHAS
+
+        for g in GODOT_GOTCHAS:
+            assert "title" in g
+            assert "problem" in g
+            assert "solution" in g
+            assert "example" in g
+            assert "category" in g
+
+
+# ---------------------------------------------------------------------------
+# gdcheck semantic analysis tests
+# ---------------------------------------------------------------------------
+
+
+class TestGdcheckSemantic:
+    """Tests for gdcheck semantic analysis features."""
+
+    async def test_mixed_indentation_detected(
+        self, tmp_godot_project, monkeypatch
+    ):
+        """gdcheck detects mixed tabs and spaces."""
+        monkeypatch.setattr("core.mcp_server.GODOT_PROJECT", tmp_godot_project)
+        monkeypatch.setattr(
+            "core.mcp_server.validator",
+            __import__(
+                "core.gd_parser", fromlist=["GDScriptValidator"]
+            ).GDScriptValidator(project_dir=tmp_godot_project),
+        )
+
+        from core.mcp_server import gdcheck
+
+        # Write file with mixed indentation
+        bad_script = "extends Node\n\nfunc _ready():\n\tpass\n    var x = 1"
+        (tmp_godot_project / "scripts").mkdir(exist_ok=True)
+        (tmp_godot_project / "scripts" / "mixed.gd").write_text(bad_script)
+
+        import json
+
+        result = await gdcheck(file_path="scripts/mixed.gd")
+        data = json.loads(result)
+        issues = data.get("semantic_issues", [])
+        assert any(i["type"] == "indentation" for i in issues)
+
+    async def test_missing_extends_detected(
+        self, tmp_godot_project, monkeypatch
+    ):
+        """gdcheck warns about missing extends/class_name."""
+        monkeypatch.setattr("core.mcp_server.GODOT_PROJECT", tmp_godot_project)
+        monkeypatch.setattr(
+            "core.mcp_server.validator",
+            __import__(
+                "core.gd_parser", fromlist=["GDScriptValidator"]
+            ).GDScriptValidator(project_dir=tmp_godot_project),
+        )
+
+        from core.mcp_server import gdcheck
+
+        # Script without extends or class_name
+        bare_script = "var x = 1\n\nfunc _ready():\n    pass"
+        (tmp_godot_project / "scripts").mkdir(exist_ok=True)
+        (tmp_godot_project / "scripts" / "bare.gd").write_text(bare_script)
+
+        import json
+
+        result = await gdcheck(file_path="scripts/bare.gd")
+        data = json.loads(result)
+        issues = data.get("semantic_issues", [])
+        assert any(i["type"] == "structure" for i in issues)
+
+    async def test_large_file_warning(
+        self, tmp_godot_project, monkeypatch
+    ):
+        """gdcheck warns about files over 300 lines."""
+        monkeypatch.setattr("core.mcp_server.GODOT_PROJECT", tmp_godot_project)
+        monkeypatch.setattr(
+            "core.mcp_server.validator",
+            __import__(
+                "core.gd_parser", fromlist=["GDScriptValidator"]
+            ).GDScriptValidator(project_dir=tmp_godot_project),
+        )
+
+        from core.mcp_server import gdcheck
+
+        # Create a 350-line script
+        lines = ["extends Node\n"] + ["\nfunc f():\n    pass\n"] * 80
+        big_script = "".join(lines)[:350 * 10]  # Ensure >300 lines
+        (tmp_godot_project / "scripts").mkdir(exist_ok=True)
+        (tmp_godot_project / "scripts" / "big.gd").write_text(
+            "extends Node\n\n" + "\n".join(f"# line {i}" for i in range(350))
+        )
+
+        import json
+
+        result = await gdcheck(file_path="scripts/big.gd")
+        data = json.loads(result)
+        issues = data.get("semantic_issues", [])
+        assert any(i["type"] == "maintainability" for i in issues)
+
+    async def test_class_name_cli_warning(
+        self, tmp_godot_project, monkeypatch
+    ):
+        """gdcheck warns about class_name usage for CLI compatibility."""
+        monkeypatch.setattr("core.mcp_server.GODOT_PROJECT", tmp_godot_project)
+        monkeypatch.setattr(
+            "core.mcp_server.validator",
+            __import__(
+                "core.gd_parser", fromlist=["GDScriptValidator"]
+            ).GDScriptValidator(project_dir=tmp_godot_project),
+        )
+
+        from core.mcp_server import gdcheck
+
+        script_with_class = "class_name MyData\nextends RefCounted\n"
+        (tmp_godot_project / "scripts").mkdir(exist_ok=True)
+        (tmp_godot_project / "scripts" / "mydata.gd").write_text(script_with_class)
+
+        import json
+
+        result = await gdcheck(file_path="scripts/mydata.gd")
+        data = json.loads(result)
+        issues = data.get("semantic_issues", [])
+        assert any(i["type"] == "cli_compatibility" for i in issues)
+
+    async def test_godot3_api_misuse_detected(
+        self, tmp_godot_project, monkeypatch
+    ):
+        """gdcheck detects Godot 3 API patterns."""
+        monkeypatch.setattr("core.mcp_server.GODOT_PROJECT", tmp_godot_project)
+        monkeypatch.setattr(
+            "core.mcp_server.validator",
+            __import__(
+                "core.gd_parser", fromlist=["GDScriptValidator"]
+            ).GDScriptValidator(project_dir=tmp_godot_project),
+        )
+
+        from core.mcp_server import gdcheck
+
+        old_api = (
+            "extends CharacterBody2D\n\n"
+            "export var speed = 100\n"
+            "onready var sprite = $Sprite\n\n"
+            "func _ready():\n"
+            "    move_and_slide(Vector2(1,0) * speed)\n"
+            "    connect('hit', self, '_on_hit')\n"
+        )
+        (tmp_godot_project / "scripts").mkdir(exist_ok=True)
+        (tmp_godot_project / "scripts" / "old_api.gd").write_text(old_api)
+
+        import json
+
+        result = await gdcheck(file_path="scripts/old_api.gd")
+        data = json.loads(result)
+        issues = data.get("semantic_issues", [])
+        api_issues = [i for i in issues if i["type"] == "api_misuse"]
+        # Should detect at least: export var, onready var, move_and_slide(args), string connect
+        assert len(api_issues) >= 3

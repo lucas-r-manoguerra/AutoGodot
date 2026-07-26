@@ -135,6 +135,9 @@ class SceneBuilder:
             with scene.use_tree() as tree:
                 self._build_tree(tree, nodes)
 
+            # Validate hierarchy for known gotchas
+            warnings = self._validate_hierarchy(nodes)
+
             # Add connections (stored as sections, not in the tree)
             for conn in definition.get("connections", []):
                 header = godot_parser.GDSectionHeader(  # type: ignore[union-attr]
@@ -154,6 +157,8 @@ class SceneBuilder:
             scene.write(str(target))
 
             msg = f"OK: Created scene {scene_path} ({len(nodes)} nodes, {len(definition.get('resources', []))} resources)"
+            if warnings:
+                msg += "\n⚠️ WARNINGS:\n" + "\n".join(f"  - {w}" for w in warnings)
             logger.info(msg)
             return msg
 
@@ -385,6 +390,79 @@ class SceneBuilder:
             )
             self._apply_properties(child, child_def.get("properties", {}))
             parent.add_child(child)
+
+    # Hierarchy gotchas detected during Tetris debugging session
+    _CONTROL_TYPES = {
+        "ColorRect", "Label", "Button", "LineEdit", "TextEdit",
+        "RichTextLabel", "TextureRect", "Panel", "MarginContainer",
+        "HBoxContainer", "VBoxContainer", "GridContainer", "ScrollContainer",
+        "TabContainer", "Tree", "ItemList", "OptionButton", "CheckBox",
+        "ProgressBar", "HSlider", "VSlider", "SpinBox", "Popup",
+        "Window", "Control",
+    }
+    _CANVASITEM_2D_TYPES = {"Node2D", "Sprite2D", "AnimatedSprite2D", "TileMap", "Camera2D"}
+
+    def _validate_hierarchy(self, nodes: list[dict[str, Any]]) -> list[str]:
+        """Check node hierarchy for known Godot rendering gotchas.
+
+        Returns a list of warning strings. Empty = no issues found.
+        """
+        warnings: list[str] = []
+
+        # Build a name->type lookup
+        node_map: dict[str, str] = {}
+        for n in nodes:
+            node_map[n["name"]] = n.get("type", "")
+
+        for n in nodes:
+            parent_path = n.get("parent")
+            if parent_path is None:
+                continue
+
+            # Resolve parent name from path
+            # "." means the root node (first node in the list)
+            if parent_path == ".":
+                parent_name = nodes[0]["name"] if nodes else ""
+            elif parent_path == "":
+                parent_name = ""
+            else:
+                # "./Player/Shape" → last segment is the direct parent
+                parent_name = parent_path.lstrip("./").split("/")[-1]
+
+            child_type = n.get("type", "")
+            parent_type = node_map.get(parent_name, "")
+
+            # GOTCHA 1: Control node (ColorRect, Label, etc.) as child of Node2D
+            # This causes the Control to render ON TOP of Node2D._draw()
+            if child_type in self._CONTROL_TYPES and parent_type in self._CANVASITEM_2D_TYPES:
+                warnings.append(
+                    f"'{child_type}' ({n['name']}) is a child of '{parent_type}' ({parent_name}). "
+                    f"Control nodes render ON TOP of their parent's _draw(). "
+                    f"Use a CanvasLayer for UI, or draw backgrounds in _draw() instead of ColorRect."
+                )
+
+            # GOTCHA 2: Node3D under Node2D or vice versa
+            if child_type.startswith("Node3D") and parent_type in self._CANVASITEM_2D_TYPES:
+                warnings.append(
+                    f"'{child_type}' ({n['name']}) is a child of '{parent_type}' ({parent_name}). "
+                    f"Mixing 2D and 3D nodes in the same branch causes rendering issues."
+                )
+            if child_type in self._CANVASITEM_2D_TYPES and parent_type.startswith("Node3D"):
+                warnings.append(
+                    f"'{child_type}' ({n['name']}) is a child of '{parent_type}' ({parent_name}). "
+                    f"Mixing 2D and 3D nodes in the same branch causes rendering issues."
+                )
+
+            # GOTCHA 3: CollisionShape without parent CollisionObject
+            if child_type in ("CollisionShape2D", "CollisionShape3D"):
+                if parent_type not in ("CharacterBody2D", "CharacterBody3D", "Area2D", "Area3D",
+                                       "StaticBody2D", "StaticBody3D", "RigidBody2D", "RigidBody3D"):
+                    warnings.append(
+                        f"'{child_type}' ({n['name']}) should be a child of a CollisionObject, "
+                        f"not '{parent_type}'. Collision shapes only work under physics bodies."
+                    )
+
+        return warnings
 
     def _apply_properties(self, node: Any, properties: dict[str, str]) -> None:
         """Apply property values to a node.
