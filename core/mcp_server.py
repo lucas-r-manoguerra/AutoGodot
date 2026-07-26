@@ -37,10 +37,13 @@ _PROJECT_ROOT = _CORE_DIR.parent
 if str(_PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(_PROJECT_ROOT))
 
+from core.auto_fixer import AutoFixer  # noqa: E402
+from core.error_parser import GodotErrorParser  # noqa: E402
 from core.gd_parser import GDScriptValidator  # noqa: E402
 from core.godot_controller import GodotController  # noqa: E402
 from core.scene_builder import SceneBuilder  # noqa: E402
 from core.script_builder import ScriptBuilder  # noqa: E402
+from core.test_runner import TestRunner  # noqa: E402
 from core.vision_qa import VisionQA  # noqa: E402
 
 # ---------------------------------------------------------------------------
@@ -71,6 +74,9 @@ vision = VisionQA()
 scene = SceneBuilder(project_dir=GODOT_PROJECT)
 script = ScriptBuilder(project_dir=GODOT_PROJECT)
 validator = GDScriptValidator(project_dir=GODOT_PROJECT)
+error_parser = GodotErrorParser(project_dir=GODOT_PROJECT)
+test_runner = TestRunner(godot_path=GODOT_PATH, project_dir=GODOT_PROJECT)
+auto_fixer = AutoFixer(project_dir=GODOT_PROJECT)
 
 # ---------------------------------------------------------------------------
 # MCP Server instance
@@ -1357,6 +1363,173 @@ async def gdcheck(file_path: str) -> str:
 
     except Exception as exc:
         msg = f"ERROR checking syntax: {exc}"
+        logger.error(msg)
+        return msg
+
+
+# ---------------------------------------------------------------------------
+# godot_errors — Parse Godot error output
+# ---------------------------------------------------------------------------
+
+
+class GodotErrorsInput(BaseModel):
+    """Input for parsing Godot error output."""
+
+    stdout: str = Field(
+        default="",
+        description="Standard output from Godot process.",
+    )
+    stderr: str = Field(
+        default="",
+        description="Standard error from Godot process.",
+    )
+
+
+@mcp.tool()
+async def godot_errors(stdout: str = "", stderr: str = "") -> str:
+    """Parse Godot error output into structured, actionable information.
+
+    Extracts errors, warnings, stack traces, and maps them to specific files
+    and lines. Use this after run_godot_test to understand what went wrong.
+
+    Returns JSON with:
+    - errors: list of structured error dicts (message, file, line, type)
+    - warnings: list of warning strings
+    - stack_traces: list of function/file/line dicts
+    - has_errors: bool
+    - summary: human-readable error summary
+    """
+    logger.info(
+        "godot_errors → parsing output (stdout=%d, stderr=%d chars)",
+        len(stdout),
+        len(stderr),
+    )
+
+    try:
+        import json
+
+        result = error_parser.parse_output(stdout, stderr)
+        return json.dumps(result, indent=2)
+
+    except Exception as exc:
+        msg = f"ERROR parsing Godot output: {exc}"
+        logger.error(msg)
+        return msg
+
+
+# ---------------------------------------------------------------------------
+# run_tests — Run GdUnit4/Gut automated tests
+# ---------------------------------------------------------------------------
+
+
+class RunTestsInput(BaseModel):
+    """Input for running automated tests."""
+
+    test_type: str = Field(
+        default="auto",
+        description="Test framework: 'gdunit4', 'gut', or 'auto' (auto-detect).",
+    )
+    scene_path: str | None = Field(
+        default=None,
+        description="Specific test scene to run. If omitted, uses project's test scene.",
+    )
+    timeout_seconds: float = Field(
+        default=60.0,
+        ge=1.0,
+        le=300.0,
+        description="Maximum seconds before timeout.",
+    )
+
+
+@mcp.tool()
+async def run_tests(
+    test_type: str = "auto",
+    scene_path: str | None = None,
+    timeout_seconds: float = 60.0,
+) -> str:
+    """Run automated tests (GdUnit4 or Gut) and return structured results.
+
+    Executes the project's test suite and parses results into a structured
+    format with pass/fail counts, individual test results, and a summary.
+
+    Use 'auto' to auto-detect the installed test framework, or specify
+    'gdunit4' or 'gut' explicitly.
+
+    Returns JSON with:
+    - passed: int
+    - failed: int
+    - errors: list of failed test details
+    - results: list of individual test results
+    - summary: human-readable summary
+    - duration: float in seconds
+    - framework: 'gdunit4' or 'gut'
+    """
+    logger.info(
+        "run_tests → type=%s scene=%s timeout=%.1fs",
+        test_type,
+        scene_path or "(auto)",
+        timeout_seconds,
+    )
+
+    try:
+        import json
+
+        result = await test_runner.run_tests(
+            test_type=test_type,
+            scene_path=scene_path,
+            timeout=timeout_seconds,
+        )
+        return json.dumps(result, indent=2)
+
+    except Exception as exc:
+        msg = f"ERROR running tests: {exc}"
+        logger.error(msg)
+        return msg
+
+
+# ---------------------------------------------------------------------------
+# auto_fix — Fix common GDScript errors
+# ---------------------------------------------------------------------------
+
+
+class AutoFixInput(BaseModel):
+    """Input for auto-fixing a GDScript file."""
+
+    file_path: str = Field(
+        ...,
+        description=(
+            "Relative path to the .gd file to fix. " "Example: 'scripts/player.gd'"
+        ),
+    )
+
+
+@mcp.tool()
+async def auto_fix(file_path: str) -> str:
+    """Automatically fix common GDScript errors in a file.
+
+    Applies fixes for:
+    - Mixed indentation (tabs vs spaces)
+    - Missing colons after control flow statements
+    - Trailing whitespace
+    - Common typos (onredy, precess, phisics, etc.)
+    - Double spaces
+
+    Returns JSON with:
+    - fixed: bool (whether any fixes were applied)
+    - fixes: list of applied fix descriptions
+    - file_path: str
+    - new_content: str (fixed content)
+    """
+    logger.info("auto_fix → %s", file_path)
+
+    try:
+        import json
+
+        result = auto_fixer.fix_errors(file_path, [])
+        return json.dumps(result, indent=2)
+
+    except Exception as exc:
+        msg = f"ERROR auto-fixing: {exc}"
         logger.error(msg)
         return msg
 
