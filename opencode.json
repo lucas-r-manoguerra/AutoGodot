@@ -1,0 +1,22 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "instructions": ["AGENTS.md"],
+  "mcp": {
+    "autogodot": {
+      "type": "local",
+      "command": [".venv/bin/python", "-m", "core.mcp_server"],
+      "enabled": true,
+      "timeout": 30000
+    }
+  },
+  "references": {
+    "autogodot-knowledge": {
+      "path": "knowledge",
+      "description": "AutoGodot knowledge base: GDScript patterns, UI patterns, resource loading, input mapping, gotchas"
+    }
+  },
+  "compaction": {
+    "auto": true,
+    "tail_turns": 20
+  }
+}

@@ -7,14 +7,10 @@ import sys
 
 from core.config import mcp, validator  # noqa: F401
 
-# Import all tool modules to register their @mcp.tool() handlers
+# Import tool modules to register their @mcp.tool() handlers
 from core.tools import (  # noqa: F401
-    file_ops,
     execution,
     visual_qa,
-    scene_ops,
-    script_ops,
-    project_scaffold,
     analysis,
     error_handling,
     knowledge,

@@ -18,12 +18,6 @@ pytestmark = pytest.mark.skipif(not HAS_MCP, reason="mcp package not installed")
 class TestToolRegistration:
     """Verify MCP tools are properly registered."""
 
-    def test_write_game_file_exists(self):
-        """write_game_file tool is registered."""
-        from core.tools.file_ops import write_game_file
-
-        assert callable(write_game_file)
-
     def test_run_godot_test_exists(self):
         """run_godot_test tool is registered."""
         from core.tools.execution import run_godot_test
@@ -35,48 +29,6 @@ class TestToolRegistration:
         from core.tools.visual_qa import capture_game_screen
 
         assert callable(capture_game_screen)
-
-    def test_read_scene_exists(self):
-        """read_scene tool is registered."""
-        from core.tools.scene_ops import read_scene
-
-        assert callable(read_scene)
-
-    def test_create_scene_exists(self):
-        """create_scene tool is registered."""
-        from core.tools.scene_ops import create_scene
-
-        assert callable(create_scene)
-
-    def test_modify_scene_exists(self):
-        """modify_scene tool is registered."""
-        from core.tools.scene_ops import modify_scene
-
-        assert callable(modify_scene)
-
-    def test_read_script_exists(self):
-        """read_script tool is registered."""
-        from core.tools.script_ops import read_script
-
-        assert callable(read_script)
-
-    def test_create_script_exists(self):
-        """create_script tool is registered."""
-        from core.tools.script_ops import create_script
-
-        assert callable(create_script)
-
-    def test_modify_script_exists(self):
-        """modify_script tool is registered."""
-        from core.tools.script_ops import modify_script
-
-        assert callable(modify_script)
-
-    def test_gdinit_exists(self):
-        """gdinit tool is registered."""
-        from core.tools.project_scaffold import gdinit
-
-        assert callable(gdinit)
 
     def test_gdexplore_exists(self):
         """gdexplore tool is registered."""
