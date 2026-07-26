@@ -1362,73 +1362,6 @@ async def gdcheck(file_path: str) -> str:
 
     try:
         import json
-        import re
-
-        def _semantic_checks(content: str, fpath: str) -> list[dict]:
-            """Run semantic checks on GDScript content."""
-            issues: list[dict] = []
-            lines = content.split("\n")
-
-            # 1. Mixed indentation
-            has_tabs = any(l.startswith("\t") for l in lines if l.strip())
-            has_spaces = any(re.match(r"^    \S", l) for l in lines if l.strip())
-            if has_tabs and has_spaces:
-                issues.append({
-                    "type": "indentation",
-                    "severity": "error",
-                    "message": "Mixed tabs and spaces — causes parse errors in Godot 4.x",
-                })
-
-            # 2. Missing extends/class_name
-            if not re.search(r"^(extends|class_name)\s", content, re.MULTILINE):
-                issues.append({
-                    "type": "structure",
-                    "severity": "warning",
-                    "message": "Missing 'extends' or 'class_name' declaration",
-                })
-
-            # 3. Large monolithic file
-            if len(lines) > 300:
-                issues.append({
-                    "type": "maintainability",
-                    "severity": "warning",
-                    "message": f"File has {len(lines)} lines — consider splitting (one file = one task)",
-                })
-
-            # 4. class_name usage (CLI gotcha)
-            class_match = re.search(r"^class_name\s+(\w+)", content, re.MULTILINE)
-            if class_match:
-                issues.append({
-                    "type": "cli_compatibility",
-                    "severity": "info",
-                    "message": (
-                        f"class_name '{class_match.group(1)}' may not resolve in CLI runs. "
-                        "Use preload() for more reliable script references."
-                    ),
-                })
-
-            # 5. Common API misuse patterns
-            api_patterns = [
-                (r"move_and_slide\s*\([^)]+\)", "move_and_slide()",
-                 "Godot 4.x: move_and_slide() takes NO arguments. Velocity is a property."),
-                (r"\.connect\s*\(\s*['\"]", ".connect()",
-                 "Godot 4.x: Use signal.connect(callable) syntax, not string-based connect."),
-                (r"get_tree\(\)\.change_scene\s*\(", "change_scene",
-                 "Godot 4.x: Use get_tree().change_scene_to_file() or change_scene_to_packed()."),
-                (r"\bexport\s+var\b", "export var",
-                 "Godot 4.x: Use @export annotation, not 'export var' keyword."),
-                (r"\bonready\s+var\b", "onready var",
-                 "Godot 4.x: Use @onready annotation, not 'onready var' keyword."),
-            ]
-            for pattern, name, msg in api_patterns:
-                if re.search(pattern, content):
-                    issues.append({
-                        "type": "api_misuse",
-                        "severity": "warning",
-                        "message": f"{name}: {msg}",
-                    })
-
-            return issues
 
         if file_path:
             result = validator.validate_file(file_path)
@@ -1436,7 +1369,7 @@ async def gdcheck(file_path: str) -> str:
             try:
                 full_path = GODOT_PROJECT / file_path
                 content = full_path.read_text(encoding="utf-8")
-                semantic = _semantic_checks(content, file_path)
+                semantic = validator.semantic_checks(content)
             except Exception:
                 semantic = []
 
@@ -1454,7 +1387,7 @@ async def gdcheck(file_path: str) -> str:
                 if fpath.endswith(".gd"):
                     try:
                         content = (GODOT_PROJECT / fpath).read_text(encoding="utf-8")
-                        issues = _semantic_checks(content, fpath)
+                        issues = validator.semantic_checks(content)
                         if issues:
                             all_semantic[fpath] = issues
                     except Exception:

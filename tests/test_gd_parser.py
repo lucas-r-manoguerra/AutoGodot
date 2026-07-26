@@ -90,3 +90,63 @@ class TestGDScriptValidator:
 
         assert result["valid"] is False
         assert "traversal" in result["errors"][0]["message"].lower()
+
+
+class TestSemanticChecks:
+    """Tests for GDScriptValidator.semantic_checks()."""
+
+    def test_mixed_indentation(self, tmp_godot_project):
+        """Detects mixed tabs and spaces."""
+        validator = GDScriptValidator(project_dir=tmp_godot_project)
+        content = "extends Node\n\nfunc _ready():\n\tpass\n    var x = 1"
+        issues = validator.semantic_checks(content)
+        assert any(i["type"] == "indentation" for i in issues)
+
+    def test_missing_extends(self, tmp_godot_project):
+        """Warns about missing extends/class_name."""
+        validator = GDScriptValidator(project_dir=tmp_godot_project)
+        content = "var x = 1\n\nfunc _ready():\n    pass"
+        issues = validator.semantic_checks(content)
+        assert any(i["type"] == "structure" for i in issues)
+
+    def test_large_file_warning(self, tmp_godot_project):
+        """Warns about files over 300 lines."""
+        validator = GDScriptValidator(project_dir=tmp_godot_project)
+        lines = ["extends Node\n"] + [f"# line {i}" for i in range(350)]
+        content = "\n".join(lines)
+        issues = validator.semantic_checks(content)
+        assert any(i["type"] == "maintainability" for i in issues)
+
+    def test_class_name_cli_warning(self, tmp_godot_project):
+        """Warns about class_name CLI compatibility."""
+        validator = GDScriptValidator(project_dir=tmp_godot_project)
+        content = "class_name MyData\nextends RefCounted\n"
+        issues = validator.semantic_checks(content)
+        assert any(i["type"] == "cli_compatibility" for i in issues)
+
+    def test_godot3_api_misuse(self, tmp_godot_project):
+        """Detects Godot 3 API patterns."""
+        validator = GDScriptValidator(project_dir=tmp_godot_project)
+        content = (
+            "extends CharacterBody2D\n\n"
+            "export var speed = 100\n"
+            "onready var sprite = $Sprite\n\n"
+            "func _ready():\n"
+            "    move_and_slide(Vector2(1,0) * speed)\n"
+            "    connect('hit', self, '_on_hit')\n"
+        )
+        issues = validator.semantic_checks(content)
+        api_issues = [i for i in issues if i["type"] == "api_misuse"]
+        assert len(api_issues) >= 3
+
+    def test_clean_script_no_issues(self, tmp_godot_project):
+        """Clean script produces no semantic issues."""
+        validator = GDScriptValidator(project_dir=tmp_godot_project)
+        content = (
+            "extends CharacterBody2D\n\n"
+            "var speed: float = 200.0\n\n"
+            "func _ready() -> void:\n"
+            "    pass\n"
+        )
+        issues = validator.semantic_checks(content)
+        assert len(issues) == 0

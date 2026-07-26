@@ -1,7 +1,7 @@
 """
-GDScript Validator — Syntax checking with gdtoolkit
-====================================================
-Provides syntax validation for .gd files using gdtoolkit parser.
+GDScript Validator — Syntax + Semantic checking with gdtoolkit
+==============================================================
+Provides syntax validation and semantic analysis for .gd files.
 Used to validate AI-generated scripts before they reach the user.
 
 Usage:
@@ -13,6 +13,7 @@ Usage:
 from __future__ import annotations
 
 import logging
+import re
 from pathlib import Path
 from typing import Any
 
@@ -147,10 +148,88 @@ class GDScriptValidator:
         )
         return summary
 
+    def semantic_checks(self, content: str) -> list[dict[str, Any]]:
+        """Run semantic analysis on GDScript content.
+
+        Detects common pitfalls that gdtoolkit parser cannot catch:
+        - Mixed indentation (tabs vs spaces)
+        - Missing extends/class_name declaration
+        - Large monolithic files (>300 lines)
+        - class_name CLI compatibility issues
+        - Common Godot 3→4 API misuse patterns
+
+        Args:
+            content: GDScript source code
+
+        Returns:
+            List of issue dicts with keys: type, severity, message
+        """
+        issues: list[dict[str, Any]] = []
+        lines = content.split("\n")
+
+        # 1. Mixed indentation
+        has_tabs = any(l.startswith("\t") for l in lines if l.strip())
+        has_spaces = any(re.match(r"^    \S", l) for l in lines if l.strip())
+        if has_tabs and has_spaces:
+            issues.append({
+                "type": "indentation",
+                "severity": "error",
+                "message": "Mixed tabs and spaces — causes parse errors in Godot 4.x",
+            })
+
+        # 2. Missing extends/class_name
+        if not re.search(r"^(extends|class_name)\s", content, re.MULTILINE):
+            issues.append({
+                "type": "structure",
+                "severity": "warning",
+                "message": "Missing 'extends' or 'class_name' declaration",
+            })
+
+        # 3. Large monolithic file
+        if len(lines) > 300:
+            issues.append({
+                "type": "maintainability",
+                "severity": "warning",
+                "message": f"File has {len(lines)} lines — consider splitting (one file = one task)",
+            })
+
+        # 4. class_name usage (CLI gotcha)
+        class_match = re.search(r"^class_name\s+(\w+)", content, re.MULTILINE)
+        if class_match:
+            issues.append({
+                "type": "cli_compatibility",
+                "severity": "info",
+                "message": (
+                    f"class_name '{class_match.group(1)}' may not resolve in CLI runs. "
+                    "Use preload() for more reliable script references."
+                ),
+            })
+
+        # 5. Common API misuse patterns
+        api_patterns = [
+            (r"move_and_slide\s*\([^)]+\)", "move_and_slide()",
+             "Godot 4.x: move_and_slide() takes NO arguments. Velocity is a property."),
+            (r"\.connect\s*\(\s*['\"]", ".connect()",
+             "Godot 4.x: Use signal.connect(callable) syntax, not string-based connect."),
+            (r"get_tree\(\)\.change_scene\s*\(", "change_scene",
+             "Godot 4.x: Use get_tree().change_scene_to_file() or change_scene_to_packed()."),
+            (r"\bexport\s+var\b", "export var",
+             "Godot 4.x: Use @export annotation, not 'export var' keyword."),
+            (r"\bonready\s+var\b", "onready var",
+             "Godot 4.x: Use @onready annotation, not 'onready var' keyword."),
+        ]
+        for pattern, name, msg in api_patterns:
+            if re.search(pattern, content):
+                issues.append({
+                    "type": "api_misuse",
+                    "severity": "warning",
+                    "message": f"{name}: {msg}",
+                })
+
+        return issues
+
     def _extract_line_number(self, error_msg: str) -> int:
         """Try to extract line number from error message."""
-        import re
-
         # Common patterns in gdtoolkit errors
         patterns = [
             r"line (\d+)",
