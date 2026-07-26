@@ -7,12 +7,26 @@
       "command": [".venv/bin/python", "-m", "core.mcp_server"],
       "enabled": true,
       "timeout": 30000
+    },
+    "context7": {
+      "type": "local",
+      "command": ["npx", "-y", "@upstash/context7-mcp@latest"],
+      "enabled": true
+    },
+    "codegraph": {
+      "type": "local",
+      "command": ["npx", "-y", "codegraph-mcp"],
+      "enabled": true
     }
   },
   "references": {
     "autogodot-knowledge": {
       "path": "knowledge",
       "description": "AutoGodot knowledge base: GDScript patterns, UI patterns, resource loading, input mapping, gotchas"
+    },
+    "godot-okf": {
+      "path": "knowledge/guides/okf-reference.md",
+      "description": "Object Keep Format — structured data format for game resources"
     }
   },
   "compaction": {

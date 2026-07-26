@@ -404,3 +404,29 @@ Before considering work done:
 - [ ] Type hints on all variables and functions
 - [ ] Signals used for cross-node communication
 - [ ] No direct node references in `_process()` (use `@onready`)
+
+## Development Methodology
+
+### SDD (Spec-Driven Development)
+Every significant feature follows this flow:
+1. **Explore**: Understand requirements, check codebase
+2. **Propose**: Create proposal with scope and approach
+3. **Spec**: Write detailed specifications with scenarios
+4. **Design**: Technical architecture and patterns
+5. **Tasks**: Break into implementation tasks with estimates
+6. **Apply**: Implement tasks (one file = one task)
+7. **Verify**: Validate against specs, run tests
+8. **Archive**: Persist learnings to engram
+
+### Architecture Patterns
+- **ECS**: Components = data, Systems = logic, Entities = nodes
+- **State Machine**: Explicit states with transition rules
+- **Event Bus**: Decoupled communication via signals
+- **Resource Pattern**: Data in .tres, logic in scripts
+- **TDD**: Test-first for logic, validate rendering visually
+
+### MCP Tools Usage
+- **context7**: Fetch Godot docs when uncertain about API
+- **engram**: Save decisions, discoveries, patterns proactively
+- **codegraph**: Explore codebase structure before editing
+- **autogodot**: Run game, capture errors, validate syntax
